@@ -231,3 +231,6 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.4;str
 .faq summary::-webkit-details-marker{display:none}
 .faq p{color:var(--muted);font-size:14px;margin-top:10px}
 a.acct{color:inherit}
+
+.day.flag small:last-child{color:var(--gold);font-size:9px;letter-spacing:.8px}
+.day.on.flag small:last-child{color:#e0cfa5}

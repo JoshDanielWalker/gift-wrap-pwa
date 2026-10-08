@@ -12,9 +12,9 @@ const PACKAGES = [
   { id: 'atelier', name: 'The Atelier', price: 165, incl: 8, extra: 24, mins: 120, wrappers: 1, badge: 'Bespoke',
     tag: 'Made-to-measure boxes and hand-lettered detail.',
     feats: ['Bespoke rigid gift boxes', 'Silk ribbon & fresh florals', 'Hand-lettered calligraphy tags', 'Senior wrapper'] },
-  { id: 'maison', name: 'Maison Couture', price: 340, incl: 12, extra: 32, mins: 180, wrappers: 2, badge: 'Couture',
+  { id: 'maison', name: 'Maison Couture', price: 340, incl: 12, extra: 32, mins: 180, wrappers: 1, badge: 'Couture',
     tag: 'A fully themed, photo-ready gifting experience.',
-    feats: ['Two master wrappers', 'Custom monogram & themed styling', 'Fabric furoshiki wraps', 'Gift-table styling & photo set'] },
+    feats: ['A dedicated master wrapper for the afternoon', 'Custom monogram & themed styling', 'Fabric furoshiki wraps', 'Gift-table styling & photo set'] },
 ];
 const PALETTES = [
   { id: 'noir', name: 'Noir', paper: '#17171a', rib: '#c9a45c' },
@@ -45,13 +45,14 @@ const SAVED = [
 const PAYMENTS = [
   { id: 'visa', name: 'Visa •••• 4242', logo: 'VISA' },
   { id: 'amex', name: 'Amex •••• 1005', logo: 'AMEX' },
-  { id: 'apple', name: 'Apple Pay', logo: 'PAY' },
 ];
+const WALLET = { id: 'apple', name: 'Apple Pay', logo: 'PAY' };
+const DEMO_EMAIL = 'josh.d.walker@me.com';
 const WRAPPER = { name: 'Camille Laurent', rating: 4.98, wraps: 1240, car: 'Black Tesla Model Y · LUX 482', bio: 'Trained in Paris. Loves a perfect corner.' };
 const STAGES = [
   { id: 'confirmed', label: 'Confirmed', long: 'Confirmed' },
-  { id: 'assigned', label: 'Wrapper assigned', long: 'Wrapper assigned' },
-  { id: 'today', label: 'Day of service', long: 'Wrapper on the way' },
+  { id: 'assigned', label: 'Order prepared', long: 'Camille is preparing' },
+  { id: 'today', label: 'Day of service', long: 'Camille is on her way' },
   { id: 'done', label: 'Complete', long: 'Completed' },
 ];
 const RITUAL = [
@@ -63,8 +64,9 @@ const FAQ = [
   ['What do you bring with you?', 'Everything: paper, ribbon, boxes, tags, tools and a protective work mat. You only need a clear table.'],
   ['What if I have more gifts than my package includes?', 'Add extra gifts on the next step for a small per-gift charge. Your wrapper can also adapt on the day.'],
   ['Can I change or cancel my appointment?', 'Yes. Rescheduling and cancellation are free up to 24 hours before your appointment.'],
-  ['Are your wrappers insured and vetted?', 'Every wrapper is background-checked, trained in-house and covered by our liability insurance.'],
-  ['How does same-day work?', '“Wrap me now” dispatches the nearest available wrapper, typically within 60 minutes, between 8am and 8pm.'],
+  ['Is your wrapper insured and vetted?', 'Camille is background-checked, trained in Paris and covered by our liability insurance.'],
+  ['Why is availability limited?', 'Every appointment is wrapped personally by Camille, so we take a small number each day. Closed days and fully booked days can be joined on a waiting list.'],
+  ['Do you offer same-day?', 'When Camille has an opening today, the earliest time is offered at the top of the schedule for a $15 priority fee.'],
   ['Do you wrap awkward shapes?', 'Absolutely: bottles, framed art, instruments, bicycles. Our Bespoke gift box add-on is made to measure.'],
   ['Is gratuity included?', 'It isn’t. Tipping is optional and goes entirely to your wrapper.'],
 ];
@@ -81,7 +83,7 @@ const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')
 const fromIso = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const hash = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 const hourLabel = h => `${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`;
-const timeLabel = t => (t === 'asap' ? 'As soon as possible' : hourLabel(+t));
+const durLabel = m => (m >= 60 ? Math.floor(m / 60) + ' hr' + (m % 60 ? ' ' + (m % 60) + ' min' : '') : m + ' min');
 const dayLong = s => fromIso(s).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 const dayShort = s => fromIso(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -115,40 +117,67 @@ function gift(palId, size) {
 }
 
 /* ---------- State ---------- */
-const KEY = 'ribbon-demo-v2';
-function seed() {
+const KEY = 'ribbon-demo-v3', ACC_KEY = 'ribbon-accounts-v1';
+const DEFAULT_PREFS = () => ({ sms: true, email: true, holiday: false });
+/** A visitor starts as a guest: nothing saved, nothing required. */
+const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, bookings: [], saved: [], cards: [], giftcards: [],
+  prefs: DEFAULT_PREFS(), waitlist: {}, bkTab: 'up' });
+/** The demo "returning client": sample history that loads when signing in as the demo account. */
+function returningClient() {
   const d = new Date(); d.setDate(d.getDate() - 21);
   const d2 = new Date(); d2.setDate(d2.getDate() - 70);
   const mk = (id, pkg, gifts, pal, date, time, addr, total) => ({
-    id, pkg, gifts, palette: pal, occasion: 'Birthday', addons: [], note: '', date: iso(date), time, address: addr, total, status: 'done', rating: 5,
-    createdAt: date.getTime() - 86400000 * 3, pay: 'visa',
+    id, pkg, gifts, palette: pal, occasion: 'Birthday', addons: [], note: '', cardmsg: '', date: iso(date), time, address: addr, total, status: 'done', rating: 5,
+    createdAt: date.getTime() - 86400000 * 3, pay: 'visa', contact: { name: 'Josh Walker', email: DEMO_EMAIL, phone: '(212) 555-0142' },
   });
-  return {
-    draft: null, saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), giftcards: [], prefs: { sms: true, email: true, holiday: false },
-    bookings: [
-      mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4),
-      mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8),
-    ],
-    
-  };
+  return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8)],
+    saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })) };
 }
-let S;
-try { S = JSON.parse(localStorage.getItem(KEY)) || seed(); } catch { S = seed(); }
-S.saved ||= SAVED.map(a => ({ ...a })); S.cards ||= PAYMENTS.map(p => ({ ...p })); S.giftcards ||= [];
-S.prefs ||= { sms: true, email: true, holiday: false };
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* private mode */ } };
+let S, ACC;
+try { S = JSON.parse(localStorage.getItem(KEY)) || guestState(); } catch { S = guestState(); }
+try { ACC = JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch { ACC = {}; }
+const ACCT_FIELDS = ['user', 'contact', 'bookings', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
+const save = () => {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(S));
+    if (S.user) { ACC[S.user.email] = Object.fromEntries(ACCT_FIELDS.map(k => [k, S[k]])); localStorage.setItem(ACC_KEY, JSON.stringify(ACC)); }
+  } catch { /* private mode */ }
+};
+const initials = n => (n || '?').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const firstName = () => (S.user?.name || S.contact.name || '').split(' ')[0];
+const nameFromEmail = e => e.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+/** Passwordless: creates the account from details already given at checkout. */
+function createAccount({ name, email, phone }) {
+  email = email.trim().toLowerCase();
+  if (ACC[email]) return signIn(email);
+  S.user = { name: name.trim(), email, phone: phone || '', since: Date.now() };
+  S.contact = { name: S.user.name, email, phone: S.user.phone }; save();
+}
+function signIn(email) {
+  email = email.trim().toLowerCase();
+  const guestBookings = S.user ? [] : S.bookings, draft = S.draft;
+  const acct = ACC[email] || (email === DEMO_EMAIL
+    ? { ...guestState(), ...returningClient(), user: { name: 'Josh Walker', email, phone: '(212) 555-0142', since: Date.now() - 86400000 * 120 } }
+    : { ...guestState(), user: { name: nameFromEmail(email), email, phone: S.contact.phone || '', since: Date.now() } });
+  S = { ...guestState(), ...acct, draft, bkTab: 'up' };
+  S.bookings = [...guestBookings, ...(acct.bookings || [])];
+  S.contact = { name: S.user.name, email, phone: S.user.phone || '' }; save();
+}
+function signOut() { save(); S = guestState(); save(); }
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e || '').trim());
+const contactOk = () => S.contact.name.trim().length >= 2 && validEmail(S.contact.email) && S.contact.phone.replace(/\D/g, '').length >= 10;
 
-function firstOpenDate() {
-  for (let i = 0; i < 14; i++) {
+function firstOpenDate(mins = 75, ign) {
+  for (let i = 0; i < 60; i++) {
     const d = new Date(); d.setDate(d.getDate() + i);
-    if (slotsFor(iso(d)).some(s => s.free)) return iso(d);
+    if (openCount(iso(d), mins, ign)) return iso(d);
   }
   return iso(new Date());
 }
 function newDraft(pkgId) {
   const p = pkgOf(pkgId || 'signature');
-  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', date: firstOpenDate(), time: null,
-    address: null, promo: '', tip: 0.1, pay: 'visa' };
+  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', date: firstOpenDate(p.mins), time: null,
+    address: null, promo: '', tip: 0.1, pay: S.cards[0]?.id || WALLET.id };
 }
 const draft = () => S.draft || (S.draft = newDraft());
 
@@ -157,7 +186,7 @@ function quote(d) {
   const p = pkgOf(d.pkg);
   const extra = Math.max(0, d.gifts - p.incl) * p.extra;
   const addons = d.addons.reduce((a, id) => a + ADDONS.find(x => x.id === id).price, 0);
-  const asap = d.time === 'asap' ? ASAP_FEE : 0;
+  const asap = d.date === iso(new Date()) ? ASAP_FEE : 0;
   const base = p.price + extra + addons;
   const rate = PROMOS[(d.promo || '').toUpperCase()] || 0;
   const discount = base * rate;
@@ -166,16 +195,42 @@ function quote(d) {
   const tip = (p.price + extra) * (d.tip || 0);
   return { p, extra, addons, asap, base, discount, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
 }
-function slotsFor(dateIso) {
-  const now = new Date(), today = iso(now) === dateIso, out = [];
-  for (let h = 9; h <= 19; h++) {
-    const past = today && h <= now.getHours() + 1;
-    const booked = hash(dateIso + h) % 4 === 0;
-    out.push({ h, free: !past && !booked });
+const OPEN_H = 9, CLOSE_H = 20, BUFFER = 30, LEAD_MIN = 90;
+/** Appointment length: package time plus 8 min for each gift beyond those included. */
+const durMins = d => { const p = pkgOf(d.pkg); return Math.ceil((p.mins + Math.max(0, d.gifts - p.incl) * 8) / 15) * 15; };
+/** Camille is our only wrapper: closed Sundays, plus the occasional private-commission day. */
+const dayOff = k => fromIso(k).getDay() === 0 || hash(k + 'off') % 13 === 0;
+/** Deterministic mock of other clients' appointments, as [startMin, endMin]. */
+function otherBookings(k) {
+  let seed = hash(k); const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const n = [3, 4, 4, 5, 2, 4, 5][seed % 7], out = [];
+  for (let i = 0; i < n; i++) { const st = (OPEN_H + Math.floor(rnd() * 10)) * 60; out.push([st, st + [60, 75, 90, 120][Math.floor(rnd() * 4)]]); }
+  return out;
+}
+function busyOn(k, ignoreId) {
+  const own = S.bookings.filter(b => b.date === k && b.status !== 'cancelled' && b.id !== ignoreId && b.time != null)
+    .map(b => [+b.time * 60, +b.time * 60 + (b.mins || pkgOf(b.pkg).mins)]);
+  return otherBookings(k).concat(own);
+}
+function slotsFor(k, mins, ignoreId) {
+  if (dayOff(k)) return Array.from({ length: CLOSE_H - OPEN_H }, (_, i) => ({ h: OPEN_H + i, free: false }));
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), today = iso(now) === k, busy = busyOn(k, ignoreId), out = [];
+  for (let h = OPEN_H; h < CLOSE_H; h++) {
+    const st = h * 60, en = st + mins;
+    const free = en <= CLOSE_H * 60 && !(today && st < nowMin + LEAD_MIN) && !busy.some(([a, b]) => st < b + BUFFER && en > a - BUFFER);
+    out.push({ h, free });
   }
   return out;
 }
-const asapAvailable = () => { const h = new Date().getHours(); return h >= 8 && h < 20; };
+const openCount = (k, mins, ign) => slotsFor(k, mins, ign).filter(s => s.free).length;
+const dayState = (k, mins, ign) => dayOff(k) ? 'off' : ({ 0: 'full', 1: 'few', 2: 'few', 3: 'few' }[openCount(k, mins, ign)] || 'open');
+function nextOpenDate(from, mins, ign) {
+  for (let i = 1; i <= 60; i++) { const x = fromIso(from); x.setDate(x.getDate() + i); if (openCount(iso(x), mins, ign)) return iso(x); }
+  return null;
+}
+const earliestToday = (mins, ign) => slotsFor(iso(new Date()), mins, ign).find(s => s.free);
+/** Drop the chosen time if a later change (gift count, package) means it no longer fits Camille's day. */
+const timeStillFree = d => !d.time || slotsFor(d.date, durMins(d), d.resched).some(s => String(s.h) === d.time && s.free);
 
 /* ---------- UI utilities ---------- */
 let toastTimer;
@@ -220,10 +275,10 @@ route(/^$/, () => {
   return { tab: '', html: `<div class="screen">
     <div class="hero"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
       <h1>The art of<br><em>giving,</em> perfected.</h1>
-      <p class="muted">Our master wrappers come to your home or office and dress every gift as if it were jewellery.</p>
+      <p class="muted">Camille, our master wrapper, comes to your home or office and dresses every gift as if it were jewellery.</p>
       <div class="heroart">${gift('ivory')}</div>
       <button class="btn" data-act="start">Book an appointment</button>
-      <p class="tiny muted mt16">Manhattan · Brooklyn · Same-day available</p></div>
+      <p class="tiny muted mt16">Manhattan · Brooklyn · Limited daily availability</p></div>
     ${up ? `<span class="tiny eyebrow">Your next appointment</span><div class="stack mt8">${bookingCard(up)}</div>` : ''}
     ${last ? `<div class="sec"><h3>Wrap again</h3></div><div class="stack"><button class="bk" data-act="rebook" data-id="${last.id}">${gift(last.palette)}<div class="grow"><b style="font-family:var(--serif);font-size:22px;font-weight:500">${pkgOf(last.pkg).name}</b>
       <div class="muted small">${last.gifts} gifts · ${palOf(last.palette).name} · ${money(last.total)}</div><span class="link">Book the same again</span></div></button></div>` : ''}
@@ -237,7 +292,7 @@ route(/^$/, () => {
       <div><i>II</i><span><b>Reserve your time</b><span class="muted small">Pick a day and arrival time, share where we should come.</span></span></div>
       <div><i>III</i><span><b>We arrive, you relax</b><span class="muted small">Your wrapper brings every material and leaves nothing behind.</span></span></div></div>
     <div class="sec"><h3>Our promise</h3></div>
-    <div class="perks"><div>${ic('sparkle')}<br>Master wrappers</div><div>${ic('bolt')}<br>Same-day available</div><div>${ic('shield')}<br>Insured &amp; vetted</div></div>
+    <div class="perks"><div>${ic('sparkle')}<br>Master wrapper</div><div>${ic('bolt')}<br>By appointment</div><div>${ic('shield')}<br>Insured &amp; vetted</div></div>
     <div class="sec"></div><p class="quote">“I handed over a pile of boxes and an hour later it looked like a boutique window.”<span>Eleanor · Upper West Side</span></p>
   </div>${tabbar('')}` };
 });
@@ -274,21 +329,28 @@ route(/^customize$/, () => {
 });
 
 route(/^schedule$/, () => {
-  const d = draft();
-  if (!slotsFor(d.date).some(s => s.free) && d.time !== 'asap') d.date = firstOpenDate();
-  const days = Array.from({ length: 14 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return x; });
-  const today = d.date === iso(new Date());
-  const slots = slotsFor(d.date);
-  return { html: flow(2, d.resched ? 'Choose a<br>new time' : 'When should we<br>arrive?', 'Your wrapper arrives within 15 minutes of the chosen time.',
-    `${asapAvailable() && !d.resched ? `<div class="pad mb8"><button class="asap ${d.time === 'asap' ? 'on' : ''}" data-act="asap"><span class="bolt">${ic('bolt')}</span>
-      <span class="grow"><b>Wrap me now</b><span class="muted small" style="display:block">A wrapper can be with you in ~60 min · +${money(ASAP_FEE)}</span></span>${d.time === 'asap' ? `<span class="check on">${ic('check')}</span>` : ''}</button></div>` : ''}
-    <div class="sec"><h3>Pick a day</h3><span class="muted small">${d.date.slice(0, 4)}</span></div>
-    <div class="days">${days.map(x => { const k = iso(x); return `<button class="day ${d.date === k && d.time !== 'asap' ? 'on' : ''}" data-act="day" data-v="${k}">
-      <small>${x.toLocaleDateString('en-US', { weekday: 'short' })}</small><b>${x.getDate()}</b><small>${x.toLocaleDateString('en-US', { month: 'short' })}</small></button>`; }).join('')}</div>
-    <div class="sec"><h3>${today ? 'Today' : dayShort(d.date)}</h3><span class="muted small">${slots.filter(s => s.free).length} slots open</span></div>
-    <div class="slots">${slots.map(s => `<button class="slot ${d.time === String(s.h) && d.time !== 'asap' ? 'on' : ''}" ${s.free ? '' : 'disabled'} data-act="slot" data-v="${s.h}">${hourLabel(s.h)}</button>`).join('')}</div>`,
-    d.resched ? `<button class="btn" ${d.time && d.time !== 'asap' ? '' : 'disabled'} data-act="resched-save">${d.time ? 'Move to ' + dayShort(d.date) + ', ' + hourLabel(+d.time) : 'Select a time'}</button>` :
-    `<a class="btn" ${d.time ? 'href="#/address"' : 'disabled'}>${d.time ? 'Confirm ' + (d.time === 'asap' ? 'as soon as possible' : dayShort(d.date) + ', ' + hourLabel(+d.time)) : 'Select a time'}</a>`) };
+  const d = draft(), mins = durMins(d), ign = d.resched;
+  if (!timeStillFree(d)) d.time = null;
+  const days = Array.from({ length: 21 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return x; });
+  const todayK = iso(new Date()), slots = slotsFor(d.date, mins, ign), open = slots.filter(s => s.free).length;
+  const early = d.resched ? null : earliestToday(mins, ign), nextK = open ? null : nextOpenDate(d.date, mins, ign);
+  const wl = (S.waitlist || {})[d.date];
+  const flag = k => ({ off: 'Closed', full: 'Full', few: 'Few left' }[dayState(k, mins, ign)]);
+  return { html: flow(2, d.resched ? 'Choose a<br>new time' : 'When should we<br>arrive?', 'Camille, our resident wrapper, takes a limited number of appointments each day.',
+    `${early ? `<div class="pad mb8"><button class="asap ${d.date === todayK && d.time === String(early.h) ? 'on' : ''}" data-act="asap"><span class="bolt">${ic('bolt')}</span>
+      <span class="grow"><b>Next available today · ${hourLabel(early.h)}</b><span class="muted small" style="display:block">Same-day priority · +${money(ASAP_FEE)}</span></span>${d.date === todayK && d.time === String(early.h) ? `<span class="check on">${ic('check')}</span>` : ''}</button></div>` : ''}
+    <div class="sec"><h3>Pick a day</h3><span class="muted small">Allow ${durLabel(mins)}</span></div>
+    <div class="days">${days.map(x => { const k = iso(x), f = flag(k); return `<button class="day ${d.date === k ? 'on' : ''} ${f ? 'flag' : ''}" data-act="day" data-v="${k}">
+      <small>${x.toLocaleDateString('en-US', { weekday: 'short' })}</small><b>${x.getDate()}</b><small>${f || x.toLocaleDateString('en-US', { month: 'short' })}</small></button>`; }).join('')}</div>
+    <div class="sec"><h3>${d.date === todayK ? 'Today' : dayShort(d.date)}</h3><span class="muted small">${open ? open + ' time' + (open > 1 ? 's' : '') + ' open' : dayOff(d.date) ? 'Closed' : 'Fully booked'}</span></div>
+    ${open ? `<div class="slots">${slots.map(s => `<button class="slot ${d.time === String(s.h) ? 'on' : ''}" ${s.free ? '' : 'disabled'} data-act="slot" data-v="${s.h}">${hourLabel(s.h)}</button>`).join('')}</div>
+      ${d.date === todayK ? `<p class="small muted pad mt16">Same-day appointments include a ${money(ASAP_FEE)} priority fee.</p>` : ''}`
+      : `<div class="pad"><div class="card center"><b style="font-family:var(--serif);font-size:21px;font-weight:500">${dayOff(d.date) ? 'Camille is away this day' : 'Camille is fully booked'}</b>
+        <p class="muted small mt8">${dayOff(d.date) ? 'We’re closed on Sundays and occasional private-commission days.' : 'Every appointment is wrapped personally, so we can’t add more on this date.'}</p>
+        <div class="mt16" style="display:grid;gap:10px">${nextK ? `<button class="btn" data-act="day" data-v="${nextK}">Next opening · ${dayShort(nextK)}</button>` : ''}
+        <button class="btn ghost" data-act="waitlist" data-v="${d.date}">${wl ? 'On the waiting list ✓' : 'Notify me if a time opens'}</button></div></div></div>`}`,
+    d.resched ? `<button class="btn" ${d.time ? '' : 'disabled'} data-act="resched-save">${d.time ? 'Move to ' + dayShort(d.date) + ', ' + hourLabel(+d.time) : 'Select a time'}</button>` :
+    `<a class="btn" ${d.time ? 'href="#/address"' : 'disabled'}>${d.time ? 'Confirm ' + dayShort(d.date) + ', ' + hourLabel(+d.time) : 'Select a time'}</a>`) };
 });
 
 route(/^address$/, () => {
@@ -297,12 +359,11 @@ route(/^address$/, () => {
     `<div class="searchbox">${ic('search')}<input id="q" placeholder="Search address" autocomplete="off" aria-label="Search address"></div>
     <div class="pad" id="results"></div>
     <div class="pad"><button class="sugg" data-act="locate"><span class="pin">${ic('pin')}</span><span class="grow"><b>Use current location</b><span class="muted small" style="display:block">Demo: uses a sample address</span></span></button></div>
-    <div class="sec"><h3>Saved places</h3><a class="link" href="#/addresses">Manage</a></div><div class="pad">${S.saved.map((s, i) => `<button class="sugg ${a && a.line === s.line ? 'on' : ''}" data-act="saved" data-i="${i}">
+    ${S.saved.length ? `<div class="sec"><h3>Saved places</h3><a class="link" href="#/addresses">Manage</a></div>` : ''}<div class="pad">${S.saved.map((s, i) => `<button class="sugg ${a && a.line === s.line ? 'on' : ''}" data-act="saved" data-i="${i}">
       <span class="pin">${ic(i ? 'cal' : 'home')}</span><span class="grow"><b>${s.label}</b><span class="muted small" style="display:block">${s.line}</span></span></button>`).join('')}</div>
     ${a ? `<div class="sec"><h3>Details</h3></div><div class="stack"><div class="card row">${ic('pin')}<div class="grow"><b>${esc(a.label || 'Selected address')}</b><div class="muted small">${esc(a.line)}</div><div class="okline mt8">${ic('check')} Within our service area</div></div></div>
       <label class="field"><span>Apt / suite / floor</span><input data-bind="address.unit" value="${esc(a.unit || '')}" placeholder="Apt 5B"></label>
-      <label class="field"><span>Access instructions</span><textarea rows="2" data-bind="address.notes" placeholder="Doorman, buzzer code, parking…">${esc(a.notes || '')}</textarea></label>
-      <label class="field"><span>Contact phone</span><input data-bind="address.phone" inputmode="tel" value="${esc(a.phone ?? '(212) 555-0142')}"></label></div>` : ''}`,
+      <label class="field"><span>Access instructions</span><textarea rows="2" data-bind="address.notes" placeholder="Doorman, buzzer code, parking…">${esc(a.notes || '')}</textarea></label></div>` : ''}`,
     `<a class="btn" ${a ? 'href="#/review"' : 'disabled'}>${a ? 'Review booking' : 'Select an address'}</a>`),
     mount() {
       const q = $('#q'), out = $('#results');
@@ -318,7 +379,8 @@ route(/^address$/, () => {
 route(/^review$/, () => {
   const d = draft(), q = quote(d);
   const pal = palOf(d.palette);
-  if (!S.cards.some(c => c.id === d.pay)) d.pay = S.cards[0]?.id;
+  if (![WALLET, ...S.cards].some(c => c.id === d.pay)) d.pay = S.cards[0]?.id || WALLET.id;
+  if (!timeStillFree(d)) { d.time = null; toast('That time is no longer available'); }
   const invalid = !d.address ? 'address' : !d.time ? 'schedule' : null;
   if (invalid) return { redirect: '#/' + invalid };
   const promoOk = PROMOS[(d.promo || '').toUpperCase()];
@@ -326,10 +388,18 @@ route(/^review$/, () => {
     `<div class="pad"><div class="card"><div class="row">${gift(d.palette, 64)}<div class="grow"><h3>${q.p.name}</h3>
       <div class="muted small">${d.gifts} gifts · ${d.occasion} · ${pal.name}</div></div><a class="link" href="#/customize">Edit</a></div>
       <div class="hline"></div>
-      <div class="kv">${ic('cal')}<div class="grow"><b>${d.time === 'asap' ? 'As soon as possible' : dayLong(d.date)}</b><div class="muted small">${d.time === 'asap' ? 'Wrapper arrives in ~60 min' : 'Arrives ' + hourLabel(+d.time)}</div></div><a class="link" href="#/schedule">Edit</a></div>
+      <div class="kv">${ic('cal')}<div class="grow"><b>${dayLong(d.date)}</b><div class="muted small">${'Arrives ' + hourLabel(+d.time)}</div></div><a class="link" href="#/schedule">Edit</a></div>
       <div class="kv">${ic('pin')}<div class="grow"><b>${esc(d.address.line)}</b><div class="muted small">${esc([d.address.unit, d.address.notes].filter(Boolean).join(' · ') || 'No extra details')}</div></div><a class="link" href="#/address">Edit</a></div></div></div>
+    <div class="sec"><h3>Your details</h3>${S.user ? '' : `<a class="link" data-act="signin">Already a client? Sign in</a>`}</div>
+    <div class="pad">${S.user ? `<div class="card row"><div class="avatar">${initials(S.user.name)}</div><div class="grow"><b>${esc(S.user.name)}</b><div class="muted small">${esc(S.user.email)}</div><div class="muted small">${esc(S.user.phone || S.contact.phone)}</div></div>${ic('check')}</div>` : `
+      <div class="actions"><button class="btn ghost sm" data-act="social" data-v="Apple">Continue with Apple</button><button class="btn ghost sm" data-act="social" data-v="Google">Continue with Google</button></div>
+      <p class="tiny muted center" style="margin:14px 0">or check out as a guest</p>
+      <div style="display:grid;gap:10px"><label class="field"><span>Full name</span><input data-bind="contact.name" value="${esc(S.contact.name)}" autocomplete="name" placeholder="Josh Walker"></label>
+      <label class="field"><span>Email</span><input data-bind="contact.email" type="email" inputmode="email" autocomplete="email" value="${esc(S.contact.email)}" placeholder="you@example.com"></label>
+      <label class="field"><span>Mobile</span><input data-bind="contact.phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(S.contact.phone)}" placeholder="(212) 555-0142"></label></div>
+      <p class="muted small mt8">Used only for your booking and a text when Camille is on her way. No account needed.</p>`}</div>
     <div class="sec"><h3>Tip your wrapper</h3></div><div class="pad"><div class="tips">${[0, .1, .15, .2].map(t => `<button class="${d.tip === t ? 'on' : ''}" data-act="tip" data-v="${t}">${t ? t * 100 + '%' : 'None'}</button>`).join('')}</div></div>
-    <div class="sec"><h3>Payment</h3></div><div class="stack">${S.cards.map(p => `<button class="pay ${d.pay === p.id ? 'on' : ''}" data-act="pay" data-id="${p.id}"><span class="cardlogo">${p.logo}</span>
+    <div class="sec"><h3>Payment</h3></div><div class="stack">${[WALLET, ...S.cards].map(p => `<button class="pay ${d.pay === p.id ? 'on' : ''}" data-act="pay" data-id="${p.id}"><span class="cardlogo">${p.logo}</span>
       <span class="grow">${p.name}</span><span class="check ${d.pay === p.id ? 'on' : ''}">${ic('check')}</span></button>`).join('')}
       <button class="pay" data-act="card-add"><span class="cardlogo">${ic('plus')}</span><span class="grow">Add a payment method</span></button></div>
     <div class="sec"><h3>Promo code</h3></div><div class="pad row"><label class="field grow"><span>Code</span><input id="promo" value="${esc(d.promo)}" placeholder="Try WRAP10" autocapitalize="characters"></label>
@@ -339,30 +409,41 @@ route(/^review$/, () => {
       <div class="line"><span>${q.p.name}</span><span>${money(q.p.price)}</span></div>
       ${q.extra ? `<div class="line"><span>${d.gifts - q.p.incl} extra gifts</span><span>${money(q.extra)}</span></div>` : ''}
       ${d.addons.map(id => { const a = ADDONS.find(x => x.id === id); return `<div class="line"><span>${a.name}</span><span>${money(a.price)}</span></div>`; }).join('')}
-      ${q.asap ? `<div class="line"><span>Same-day dispatch</span><span>${money(q.asap)}</span></div>` : ''}
+      ${q.asap ? `<div class="line"><span>Same-day priority</span><span>${money(q.asap)}</span></div>` : ''}
       ${q.discount ? `<div class="line disc"><span>Promo ${esc(d.promo.toUpperCase())}</span><span>−${money(q.discount)}</span></div>` : ''}
       <div class="line"><span>Service fee</span><span>${money(q.fee)}</span></div>
       <div class="line"><span>Tax</span><span>${money(q.tax)}</span></div>
       ${q.tip ? `<div class="line"><span>Tip</span><span>${money(q.tip)}</span></div>` : ''}
       <div class="line tot"><span>Total</span><span>${money(q.total)}</span></div></div></div>
     <p class="muted small pad mt16">Free cancellation up to 24 hours before your appointment.</p>`,
-    `<button class="btn" ${d.pay ? '' : 'disabled'} data-act="book">${d.pay ? 'Book · ' + money(q.total) : 'Add a payment method'}</button>`) };
+    `<button class="btn" id="bookbtn" ${contactOk() ? '' : 'disabled'} data-act="book">${contactOk() ? 'Book · ' + money(q.total) : 'Add your details to book'}</button>`) };
 });
 
+/** Offered once, right after the booking: the details are already known, so it is a single tap. */
+function acctPrompt(b) {
+  if (S.user) return `<div class="card row mt16">${ic('check')}<div class="grow small"><b>Saved to your Ribbon Circle account</b><div class="muted">A secure sign-in link was sent to ${esc(S.user.email)}.</div></div></div>`;
+  if (b.noAcct) return '';
+  return `<div class="card mt16" style="border-color:var(--gold2)"><span class="tiny gold">Ribbon Circle</span>
+    <h3 style="font-size:23px;margin:4px 0 6px">Book faster next time</h3>
+    <p class="muted small">We already have your name, email and address. Keep them, along with this booking, and your next appointment takes seconds.</p>
+    <button class="btn mt16" data-act="quick-account" data-id="${b.id}">Create my account</button>
+    <button class="link mt16" style="display:block;margin:12px auto 0;border:0;color:var(--muted)" data-act="dismiss-acct" data-id="${b.id}">Not now</button>
+    <p class="tiny muted center mt8" style="letter-spacing:1px;text-transform:none;font-size:11px">No password to remember. We’ll email a secure sign-in link.</p></div>`;
+}
 route(/^confirmed\/([\w-]+)$/, id => {
   const b = S.bookings.find(x => x.id === id);
   if (!b) return { redirect: '#/bookings' };
   const p = pkgOf(b.pkg);
   return { html: `<div class="screen">
     <div class="seal"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-    <h1 class="title center">Your appointment<br>is reserved.</h1><p class="sub center">A confirmation is on its way to josh.d.walker@me.com</p>
+    <h1 class="title center">Your appointment<br>is reserved.</h1><p class="sub center">A confirmation is on its way to ${esc(b.contact?.email || '')}</p>
     <div class="pad"><div class="appt"><span class="tiny gold">${b.id}</span>
-      <div class="when">${b.time === 'asap' ? 'Today, as soon as possible' : dayLong(b.date)}</div>
-      <div class="muted">${b.time === 'asap' ? 'Arrival in approximately 60 minutes' : 'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="when">${dayLong(b.date)}</div>
+      <div class="muted">${'Arrival at ' + hourLabel(+b.time)}</div>
       <div class="hline"></div><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div>
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
-      <p class="muted small mt16 center">Your wrapper is introduced to you the day before. Free changes up to 24 hours ahead.</p></div>
+      <p class="muted small mt16 center">Camille will message you the day before. Free changes up to 24 hours ahead.</p>${acctPrompt(b)}</div>
     <div class="cta"><a class="btn" href="#/track/${b.id}">View booking</a><div class="actions mt8"><button class="btn ghost" data-act="ics" data-id="${b.id}">Add to calendar</button><a class="btn ghost" href="#/">Done</a></div></div></div>` };
 });
 
@@ -371,7 +452,7 @@ const bookingCard = b => {
   const st = b.status === 'cancelled' ? 'Cancelled' : STAGES.find(s => s.id === b.status).long;
   return `<a class="bk" href="#/track/${b.id}">${gift(b.palette)}<div class="grow"><span class="status ${b.status === 'done' ? 'done' : b.status === 'cancelled' ? 'cancelled' : ''}">${st}</span>
     <div style="font-family:var(--serif);font-size:22px;margin-top:6px">${p.name}</div>
-    <div class="muted small">${b.time === 'asap' ? 'Today · as soon as possible' : dayShort(b.date) + ' · ' + hourLabel(+b.time)}</div>
+    <div class="muted small">${dayShort(b.date) + ' · ' + hourLabel(+b.time)}</div>
     <div class="muted small">${esc(b.address.line)}</div></div></a>`;
 };
 
@@ -381,17 +462,29 @@ route(/^bookings$/, () => {
     .sort((a, b) => tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
   return { tab: 'bookings', html: `<div class="screen"><h1 class="title" style="padding-top:calc(24px + var(--safe-t))">Your bookings</h1>
     <div class="seg"><button class="${tab === 'up' ? 'on' : ''}" data-act="bktab" data-v="up">Upcoming</button><button class="${tab === 'past' ? 'on' : ''}" data-act="bktab" data-v="past">Past</button></div>
+    ${!S.user && S.bookings.length ? `<div class="pad mb8"><div class="card row"><div class="grow small"><b>Keep these bookings</b><div class="muted">Create an account to see them on any device.</div></div><button class="btn sm ghost" data-act="signup">Create</button></div></div>` : ''}
     <div class="stack">${list.length ? list.map(bookingCard).join('') : `<div class="empty">${gift('noir')}<p class="mt16">${tab === 'up' ? 'Nothing booked yet.' : 'No past bookings.'}</p>
-      ${tab === 'up' ? '<button class="btn mt16" data-act="start">Book a wrapper</button>' : ''}</div>`}</div></div>${tabbar('bookings')}` };
+      ${tab === 'up' ? '<button class="btn mt16" data-act="start">Book a wrapper</button>' : ''}${!S.user ? '<button class="link mt16" style="border:0" data-act="signin">Already a client? Sign in</button>' : ''}</div>`}</div></div>${tabbar('bookings')}` };
 });
 
-route(/^account$/, () => ({ tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))"><div class="row"><div class="avatar">JW</div>
-  <div><h2 style="font-size:24px">Josh Walker</h2><div class="muted small">josh.d.walker@me.com</div></div></div>
-  <div class="card mt24 row between"><div><div class="tiny gold">Ribbon Circle</div><b>Gold member</b><div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed</div></div>${ic('sparkle')}</div>
-  <div class="mt16">${[['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']].map(([i, t, s, h]) =>
-    `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('')}
-  <button class="acct" data-act="reset">${ic('reset')}<span class="grow"><b>Reset demo data</b><span class="muted small" style="display:block">Clear bookings and start fresh</span></span></button></div>
-  <p class="muted small center mt24">Ribbon &amp; Co. demo · all data is mocked</p></div></div>${tabbar('account')}` }));
+route(/^account$/, () => {
+  const u = S.user, rows = u
+    ? [['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
+    : [['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
+  const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
+  return { tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
+    <div><h2 style="font-size:26px">${esc(u.name)}</h2><div class="muted small">${esc(u.email)}</div></div></div>
+    <div class="card mt24 row between"><div><div class="tiny gold">Ribbon Circle</div><b>Member since ${new Date(u.since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
+      <div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed</div></div>${ic('sparkle')}</div>` :
+    `<span class="tiny gold">Ribbon Circle</span><h1 style="font-size:34px;line-height:1.1;margin:6px 0 10px">Your details,<br>remembered.</h1>
+    <p class="muted">You’re browsing as a guest. You never need an account to book, but one makes every visit faster.</p>
+    <ul class="checklist mt16"><li>${ic('check')}Rebook a favourite wrap in one tap</li><li>${ic('check')}Saved addresses and payment cards</li><li>${ic('check')}First access to holiday appointments</li></ul>
+    <button class="btn mt24" data-act="signup">Create an account</button><button class="btn ghost mt8" data-act="signin">Sign in</button>`}
+    <div class="mt24">${list}
+    ${u ? `<button class="acct" data-act="signout">${ic('close')}<span class="grow"><b>Sign out</b></span></button>` : ''}
+    <button class="acct" data-act="reset">${ic('reset')}<span class="grow"><b>Reset demo data</b><span class="muted small" style="display:block">Clear everything and start as a new guest</span></span></button></div>
+    <p class="muted small center mt24">Ribbon &amp; Co. demo · all data is mocked</p></div></div>${tabbar('account')}` };
+});
 
 /* ---------- Booking detail ---------- */
 function setStatus(id, status) {
@@ -402,27 +495,26 @@ function setStatus(id, status) {
 function bookingView(b) {
   const p = pkgOf(b.pkg), idx = STAGES.findIndex(s => s.id === b.status), cancelled = b.status === 'cancelled';
   const first = WRAPPER.name.split(' ')[0];
-  const nextLabel = { confirmed: 'wrapper assigned', assigned: 'day of service', today: 'completed' }[b.status];
+  const nextLabel = { confirmed: 'order prepared', assigned: 'day of service', today: 'completed' }[b.status];
   const addons = (b.addons || []).map(id => ADDONS.find(a => a.id === id));
   const intro = {
-    confirmed: ['A wrapper is being matched', 'We’ll introduce your wrapper by message the day before your appointment.'],
-    assigned: [`${first} will be with you`, 'Your wrapper has reviewed your order and will bring every material.'],
+    confirmed: ['Camille is reserved for you', 'She’ll review your order the day before and arrive with every material.'],
+    assigned: [`${first} will be with you`, 'Camille has reviewed your order and prepared every material.'],
     today: [`${first} is on her way`, 'Please have your gifts gathered in one place. You’ll receive a message on arrival.'],
     done: ['Wrapped to perfection', 'We hope they love it.'],
   };
   return `<div class="screen" style="padding-bottom:calc(40px + var(--safe-b))">
     <div class="topbar"><a class="iconbtn" href="#/bookings" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Booking ${b.id}</div></div>
     <div class="pad"><div class="appt"><span class="status ${b.status === 'done' ? 'done' : cancelled ? 'cancelled' : ''}">${cancelled ? 'Cancelled' : STAGES[idx].long}</span>
-      <div class="when">${b.time === 'asap' ? 'Today, as soon as possible' : dayLong(b.date)}</div>
-      <div class="muted">${b.time === 'asap' ? 'Same-day dispatch' : 'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="when">${dayLong(b.date)}</div>
+      <div class="muted">${'Arrival at ' + hourLabel(+b.time)}</div>
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div></div>
     ${cancelled ? '' : `<div class="pad mt24"><div class="timeline">${STAGES.map((s, i) => `<div class="tl ${i < idx || b.status === 'done' ? 'done' : i === idx ? 'now' : ''}"><i></i>${s.label}</div>`).join('')}</div></div>`}
     <div class="sec"><h3>${cancelled ? 'Booking cancelled' : 'Your wrapper'}</h3></div>
-    <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : idx >= 1 ? `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${WRAPPER.name}</b>
+    <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${WRAPPER.name}</b>
         <div class="muted small">★ ${WRAPPER.rating} · ${WRAPPER.wraps.toLocaleString()} wraps · ${WRAPPER.bio}</div></div></div>
         <p class="small mt16">${intro[b.status][1]}</p>
-        <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`
-        : `<div class="card"><b>${intro.confirmed[0]}</b><p class="muted small mt8">${intro.confirmed[1]}</p></div>`}</div>
+        <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`}</div>
     ${b.status === 'done' ? `<div class="sec"><h3>Rate your experience</h3></div><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div>` : ''}
     <div class="sec"><h3>Your order</h3></div>
     <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
@@ -505,19 +597,36 @@ function render() {
 window.addEventListener('hashchange', () => { closeSheet(); render(); });
 
 /* ---------- Actions ---------- */
-const bind = (path, v) => { const parts = path.split('.'); let o = draft(); while (parts.length > 1) o = o[parts.shift()] ||= {}; o[parts[0]] = v; save(); };
+const bind = (path, v) => { const parts = path.split('.'); let o = parts[0] === 'contact' ? S : draft(); while (parts.length > 1) o = o[parts.shift()] ||= {}; o[parts[0]] = v; save(); };
 let pend = {};
+function authSheet(mode) {
+  const up = mode === 'signup';
+  openSheet(`<div id="auth" data-mode="${mode}"><h3>${up ? 'Create your account' : 'Welcome back'}</h3>
+    <p class="muted small mb8">${up ? 'No password to remember. We’ll email a secure sign-in link.' : 'We’ll send a one-time code to your email.'}</p>
+    <div id="auth-1"><div class="actions mt16"><button class="btn ghost sm" data-act="social" data-v="Apple">Apple</button><button class="btn ghost sm" data-act="social" data-v="Google">Google</button></div>
+      <p class="tiny muted center" style="margin:14px 0">or with email</p>
+      <div style="display:grid;gap:10px">${up ? `<label class="field"><span>Full name</span><input id="an" autocomplete="name" value="${esc(S.contact.name)}"></label>` : ''}
+      <label class="field"><span>Email</span><input id="ae" type="email" inputmode="email" autocomplete="email" value="${esc(S.contact.email)}" placeholder="you@example.com"></label>
+      ${up ? `<label class="field"><span>Mobile (optional)</span><input id="ap" type="tel" inputmode="tel" autocomplete="tel" value="${esc(S.contact.phone)}"></label>` : ''}
+      <button class="btn" data-act="auth-submit">${up ? 'Create account' : 'Send me a code'}</button></div>
+      <p class="small center mt16 muted">${up ? 'Already have an account?' : 'New here?'} <a class="link" data-act="auth-switch" data-v="${up ? 'signin' : 'signup'}">${up ? 'Sign in' : 'Create an account'}</a></p>
+      ${up ? '' : `<p class="small center mt8"><a class="link" data-act="auth-demo">Use the demo account</a></p>`}</div>
+    <div id="auth-2" hidden><p class="mt16">Enter the 6-digit code we sent to <b id="aem"></b>.</p>
+      <label class="field mt16"><span>Code</span><input id="acode" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code"></label>
+      <button class="btn mt16" data-act="auth-code">Sign in</button><p class="muted small center mt8">Demo: any 6 digits will work.</p></div></div>`);
+}
 const actions = {
   start(el) { if (!S.draft || S.draft.resched || el.dataset.pkg) S.draft = newDraft(el.dataset.pkg); save(); location.hash = el.dataset.pkg ? '#/customize' : '#/packages'; },
   exit() { S.draft = null; save(); },
-  'pick-pkg'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; save(); render(); },
-  gifts(el) { const d = draft(); d.gifts = Math.min(30, Math.max(1, d.gifts + +el.dataset.d)); save(); render(); },
+  'pick-pkg'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; if (!timeStillFree(d)) d.time = null; save(); render(); },
+  gifts(el) { const d = draft(); d.gifts = Math.min(30, Math.max(1, d.gifts + +el.dataset.d)); if (!timeStillFree(d)) d.time = null; save(); render(); },
   occasion(el) { draft().occasion = el.dataset.v; save(); render(); },
   palette(el) { draft().palette = el.dataset.id; save(); render(); },
   addon(el) { const d = draft(), i = d.addons.indexOf(el.dataset.id); i < 0 ? d.addons.push(el.dataset.id) : d.addons.splice(i, 1); save(); render(); },
-  day(el) { const d = draft(); d.date = el.dataset.v; if (d.time === 'asap' || !slotsFor(d.date).find(s => String(s.h) === d.time && s.free)) d.time = null; save(); render(); },
+  day(el) { const d = draft(); d.date = el.dataset.v; if (!timeStillFree(d)) d.time = null; save(); render(); const a = $('.day.on'); a && a.scrollIntoView({ inline: 'center', block: 'nearest' }); },
+  waitlist(el) { S.waitlist ||= {}; S.waitlist[el.dataset.v] = !S.waitlist[el.dataset.v]; save(); render(); toast(S.waitlist[el.dataset.v] ? 'We’ll message you if a time opens' : 'Removed from waiting list'); },
   slot(el) { draft().time = el.dataset.v; save(); render(); },
-  asap() { const d = draft(); d.time = 'asap'; d.date = iso(new Date()); save(); render(); },
+  asap() { const d = draft(), e = earliestToday(durMins(d), d.resched); if (!e) return; d.date = iso(new Date()); d.time = String(e.h); save(); render(); },
   saved(el) { draft().address = { ...S.saved[+el.dataset.i] }; save(); render(); },
   place(el) { draft().address = { label: 'New address', line: el.dataset.v, unit: '' }; save(); render(); },
   locate() { draft().address = { label: 'Current location', line: '350 5th Ave, New York, NY 10118', unit: '' }; save(); toast('Location found'); render(); },
@@ -525,10 +634,11 @@ const actions = {
   pay(el) { draft().pay = el.dataset.id; save(); render(); },
   promo() { draft().promo = $('#promo').value.trim(); save(); render(); },
   book() {
+    if (!contactOk()) return;
     const d = draft(), q = quote(d);
     const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
-      note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.time === 'asap' ? iso(new Date()) : d.date, time: d.time, address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
-    S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; save();
+      contact: { ...S.contact }, note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+    S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
     location.hash = '#/confirmed/' + b.id;
   },
   bktab(el) { S.bkTab = el.dataset.v; save(); render(); },
@@ -561,9 +671,9 @@ const actions = {
   },
   ics(el) {
     const b = S.bookings.find(x => x.id === el.dataset.id), p = pkgOf(b.pkg);
-    const d = fromIso(b.date); d.setHours(b.time === 'asap' ? new Date().getHours() + 1 : +b.time, 0, 0, 0);
+    const d = fromIso(b.date); d.setHours(+b.time, 0, 0, 0);
     const f = x => x.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    const end = new Date(d.getTime() + p.mins * 60000);
+    const end = new Date(d.getTime() + (b.mins || p.mins) * 60000);
     const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ribbon & Co.//Demo//EN', 'BEGIN:VEVENT', `UID:${b.id}@ribbon.demo`, `DTSTAMP:${f(new Date())}`,
       `DTSTART:${f(d)}`, `DTEND:${f(end)}`, `SUMMARY:Ribbon & Co. — ${p.name}`, `LOCATION:${b.address.line.replace(/,/g, '\\,')}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = b.id + '.ics'; a.click();
@@ -581,15 +691,15 @@ const actions = {
       <div class="how" style="padding:0">${RITUAL.map(([t, d], n) => `<div style="padding:12px 0"><i style="font-size:22px">${n + 1}</i><span><b style="font-size:17px">${t}</b><span class="muted small">${d}</span></span></div>`).join('')}</div>
       <button class="btn mt16" data-act="pick-close" data-id="${p.id}">Select ${p.name}</button>`);
   },
-  'pick-close'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; save(); closeSheet(); render(); },
+  'pick-close'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; if (!timeStillFree(d)) d.time = null; save(); closeSheet(); render(); },
   resched(el) {
     const b = S.bookings.find(x => x.id === el.dataset.id), d = newDraft(b.pkg);
-    Object.assign(d, { gifts: b.gifts, address: { ...b.address }, date: firstOpenDate(), time: null, resched: b.id });
+    Object.assign(d, { gifts: b.gifts, address: { ...b.address }, resched: b.id }); d.date = firstOpenDate(b.mins || pkgOf(b.pkg).mins, b.id); d.time = null;
     S.draft = d; save(); location.hash = '#/schedule';
   },
   'resched-save'() {
     const d = draft(), b = S.bookings.find(x => x.id === d.resched);
-    b.date = d.date; b.time = d.time; b.moved = (b.moved || 0) + 1; b.status = 'confirmed'; S.draft = null; save();
+    b.date = d.date; b.time = d.time; b.mins = durMins(d); b.moved = (b.moved || 0) + 1; b.status = 'confirmed'; S.draft = null; save();
     location.hash = '#/track/' + b.id; toast('Appointment moved to ' + dayShort(b.date));
   },
   'addr-del'(el) { S.saved.splice(+el.dataset.i, 1); save(); render(); },
@@ -636,15 +746,46 @@ const actions = {
   pref(el) { S.prefs[el.dataset.k] = !S.prefs[el.dataset.k]; save(); render(); },
   'call-support'() { toast('Calling concierge… (demo)'); },
   'chat-support'() {
-    openSheet(`<h3>Concierge</h3><div id="msgs" style="display:grid;gap:8px;margin-bottom:14px"><div class="bubble them">Good day, Josh. How may we assist?</div></div>
+    openSheet(`<h3>Concierge</h3><div id="msgs" style="display:grid;gap:8px;margin-bottom:14px"><div class="bubble them">Good day${firstName() ? ', ' + esc(firstName()) : ''}. How may we assist?</div></div>
       <div class="chips" style="padding:0 0 12px">${['Change my appointment', 'Question about a package', 'Corporate gifting', 'Something else'].map(t => `<button class="chip" data-act="reply" data-v="${t}">${t}</button>`).join('')}</div>`);
   },
+  signin() { authSheet('signin'); },
+  signup() { authSheet('signup'); },
+  social(el) { signIn(DEMO_EMAIL); closeSheet(); render(); toast('Signed in with ' + el.dataset.v); },
+  'auth-submit'() {
+    const mode = $('#auth').dataset.mode;
+    if (mode === 'signup') {
+      const name = $('#an').value, email = $('#ae').value, phone = $('#ap').value;
+      if (name.trim().length < 2) return toast('Please add your name');
+      if (!validEmail(email)) return toast('Please enter a valid email');
+      createAccount({ name, email, phone }); closeSheet(); render(); toast('Welcome to Ribbon Circle');
+    } else {
+      const email = $('#ae').value;
+      if (!validEmail(email)) return toast('Please enter a valid email');
+      $('#auth-1').hidden = true; $('#auth-2').hidden = false; $('#aem').textContent = email.trim(); $('#acode').focus();
+    }
+  },
+  'auth-code'() {
+    const code = $('#acode').value.replace(/\D/g, '');
+    if (code.length < 6) return toast('Enter the 6-digit code');
+    signIn($('#ae').value); closeSheet(); render(); toast('Welcome back, ' + firstName());
+  },
+  'auth-demo'() { $('#ae').value = DEMO_EMAIL; },
+  'auth-switch'(el) { authSheet(el.dataset.v); },
+  'quick-account'(el) {
+    const b = S.bookings.find(x => x.id === el.dataset.id);
+    createAccount(b.contact);
+    const a = b.address; if (a && !S.saved.some(x => x.line === a.line)) S.saved.push({ label: S.saved.length ? 'Other' : 'Home', line: a.line, unit: a.unit || '' });
+    save(); render(); toast('Account created');
+  },
+  'dismiss-acct'(el) { const b = S.bookings.find(x => x.id === el.dataset.id); b.noAcct = true; save(); render(); },
+  signout() { signOut(); location.hash = '#/'; render(); toast('Signed out'); },
   soon() { toast('Not part of this demo'); },
   reset() {
-    openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking you created and restores the sample history.</p>
+    openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>
       <button class="btn mt16" data-act="reset-yes">Reset</button><button class="btn ghost mt8" data-act="close">Cancel</button>`);
   },
-  'reset-yes'() { S = seed(); save(); closeSheet(); toast('Demo reset'); location.hash = '#/'; render(); },
+  'reset-yes'() { S = guestState(); ACC = {}; try { localStorage.removeItem(ACC_KEY); } catch { /* ignore */ } save(); closeSheet(); toast('Demo reset'); location.hash = '#/'; render(); },
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -652,7 +793,11 @@ document.addEventListener('click', e => {
   if (el.tagName !== 'A') e.preventDefault();
   fn(el, e);
 });
-document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.bind; if (k) bind(k, e.target.value); });
+document.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.bind; if (!k) return;
+  bind(k, e.target.value);
+  const btn = $('#bookbtn'); if (btn) { const ok = contactOk(); btn.disabled = !ok; btn.textContent = ok ? 'Book · ' + money(quote(draft()).total) : 'Add your details to book'; }
+});
 
 /* ---------- Boot ---------- */
 if (!location.hash) location.replace('#/');
