@@ -71,6 +71,7 @@ const FAQ = [
   ['Do you wrap awkward shapes?', 'Absolutely: bottles, framed art, instruments, bicycles. Our Bespoke gift box add-on is made to measure.'],
   ['Is gratuity included?', 'It isn’t. Tipping is optional and goes entirely to your wrapper.'],
 ];
+const INVITE_CREDIT = 30;
 const PROMOS = { WRAP10: 0.1, WELCOME15: 0.15 };
 const TAX = 0.08875, SERVICE_FEE = 6, ASAP_FEE = 15;
 
@@ -122,7 +123,7 @@ function gift(palId, size) {
 const KEY = 'ribbon-demo-v3', ACC_KEY = 'ribbon-accounts-v1';
 const DEFAULT_PREFS = () => ({ sms: true, email: true, holiday: false, occ: true });
 /** A visitor starts as a guest: nothing saved, nothing required. */
-const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, bookings: [], occasions: [], saved: [], cards: [], giftcards: [],
+const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, credit: 0, referrals: [], invite: null, bookings: [], occasions: [], saved: [], cards: [], giftcards: [],
   prefs: DEFAULT_PREFS(), waitlist: {}, bkTab: 'up' });
 const plusDays = n => { const x = new Date(); x.setDate(x.getDate() + n); return x; };
 /** Sample remembered occasions, dated relative to today so the demo always has something upcoming. */
@@ -144,12 +145,13 @@ function returningClient() {
     createdAt: date.getTime() - 86400000 * 3, pay: 'visa', contact: { name: 'Josh Walker', email: DEMO_EMAIL, phone: '(212) 555-0142' },
   });
   return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8)],
-    saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), occasions: demoOccasions() };
+    saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), occasions: demoOccasions(), credit: 30,
+    referrals: [{ id: 'r1', name: 'Eleanor R.', status: 'completed', date: iso(plusDays(-40)) }, { id: 'r2', name: 'Marcus T.', status: 'invited', date: iso(plusDays(-3)) }] };
 }
 let S, ACC;
 try { S = JSON.parse(localStorage.getItem(KEY)) || guestState(); } catch { S = guestState(); }
 try { ACC = JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch { ACC = {}; }
-const ACCT_FIELDS = ['user', 'contact', 'bookings', 'occasions', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
+const ACCT_FIELDS = ['user', 'contact', 'credit', 'referrals', 'bookings', 'occasions', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
 const save = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify(S));
@@ -172,7 +174,7 @@ function signIn(email) {
   const acct = ACC[email] || (email === DEMO_EMAIL
     ? { ...guestState(), ...returningClient(), user: { name: 'Josh Walker', email, phone: '(212) 555-0142', since: Date.now() - 86400000 * 120 } }
     : { ...guestState(), user: { name: nameFromEmail(email), email, phone: S.contact.phone || '', since: Date.now() } });
-  S = { ...guestState(), ...acct, draft, bkTab: 'up' };
+  S = { ...guestState(), ...acct, draft, invite: S.invite, bkTab: 'up' };
   S.bookings = [...guestBookings, ...(acct.bookings || [])];
   S.occasions = [...guestOcc, ...(acct.occasions || [])];
   S.contact = { name: S.user.name, email, phone: S.user.phone || '' }; save();
@@ -188,9 +190,15 @@ function firstOpenDate(mins = 75, ign) {
   }
   return iso(new Date());
 }
+/** Early-reservation courtesy: complimentary hand-lettered tags on holiday dates booked in good time. */
+function syncEarly(d) {
+  const on = isSeason(d.date) && earlyOpen();
+  if (on && !d.addons.includes('calli')) { d.addons.push('calli'); d.earlyAdded = true; }
+  else if (!on && d.earlyAdded) { d.addons = d.addons.filter(id => id !== 'calli'); d.earlyAdded = false; }
+}
 function newDraft(pkgId) {
   const p = pkgOf(pkgId || 'signature');
-  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], remember: false, remWho: '', remDate: '', occId: null, perk: false, date: firstOpenDate(p.mins), time: null,
+  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], remember: false, remWho: '', remDate: '', occId: null, perk: false, earlyAdded: false, date: firstOpenDate(p.mins), time: null,
     address: null, promo: '', tip: 0.1, pay: S.cards[0]?.id || WALLET.id };
 }
 const draft = () => S.draft || (S.draft = newDraft());
@@ -201,24 +209,54 @@ function quote(d) {
   const extra = Math.max(0, d.gifts - p.incl) * p.extra;
   const addons = d.addons.reduce((a, id) => a + ADDONS.find(x => x.id === id).price, 0);
   const asap = d.date === iso(new Date()) ? ASAP_FEE : 0;
+  const peak = isPeak(d.date) ? PEAK_FEE : 0;
   const base = p.price + extra + addons;
   const rate = PROMOS[(d.promo || '').toUpperCase()] || 0;
   const discount = base * rate;
   const perk = d.perk && d.addons.includes('seal') ? ADDONS.find(a => a.id === 'seal').price : 0;
-  const taxable = base - discount - perk + asap + SERVICE_FEE;
+  const early = isSeason(d.date) && earlyOpen() && d.addons.includes('calli') ? ADDONS.find(a => a.id === 'calli').price : 0;
+  const room = Math.max(0, base - discount - perk - early);
+  const invite = S.invite && !S.invite.used && S.bookings.length === 0 ? Math.min(INVITE_CREDIT, room) : 0;
+  const credit = Math.min(S.credit || 0, room - invite);
+  const taxable = base - discount - perk - early - invite - credit + peak + asap + SERVICE_FEE;
   const tax = taxable * TAX;
   const tip = (p.price + extra) * (d.tip || 0);
-  return { p, extra, addons, asap, base, discount, perk, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
+  return { p, extra, addons, asap, peak, base, discount, perk, early, invite, inviteFrom: S.invite?.from, credit, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
 }
 const OPEN_H = 9, CLOSE_H = 20, BUFFER = 30, LEAD_MIN = 90;
 /** Appointment length: package time plus 8 min for each gift beyond those included. */
 const durMins = d => { const p = pkgOf(d.pkg); return Math.ceil((p.mins + Math.max(0, d.gifts - p.incl) * 8) / 15) * 15; };
 /** Camille is our only wrapper: closed Sundays, plus the occasional private-commission day. */
-const dayOff = k => fromIso(k).getDay() === 0 || hash(k + 'off') % 13 === 0;
+/* ---------- The Holiday Season: a reservation event, not a rush ---------- */
+const PEAK_FEE = 40, DEPOSIT_RATE = 0.25;
+function season() {
+  const t = new Date(), y = t.getMonth() === 11 && t.getDate() > 23 ? t.getFullYear() + 1 : t.getFullYear();
+  return { y, start: `${y}-12-01`, end: `${y}-12-23`, peakFrom: `${y}-12-17`, priority: `${y}-10-01`, publicOpens: `${y}-11-01`, earlyBy: `${y}-11-15`, changesUntil: `${y}-11-24` };
+}
+const isSeason = k => { const se = season(); return k >= se.start && k <= se.end; };
+const isPeak = k => { const se = season(); return k >= se.peakFrom && k <= se.end; };
+/** Returning clients and members reserve first; everyone else once the diary opens to the public. */
+const eligible = () => !!S.user && (S.bookings.some(b => b.status !== 'cancelled') || S.occasions.length > 0);
+const seasonLocked = k => isSeason(k) && iso(new Date()) < season().publicOpens && !eligible();
+const earlyOpen = () => iso(new Date()) <= season().earlyBy;
+const depositOf = (d, q) => isSeason(d.date) ? Math.round(q.total * DEPOSIT_RATE * 100) / 100 : 0;
+const bookLabel = d => { const dep = depositOf(d, quote(d)); return dep ? 'Reserve · ' + money(dep) + ' today' : 'Book · ' + money(quote(d).total); };
+/** Honest scarcity: share of Camille's December slots already taken. */
+function seasonStats() {
+  const se = season(); let free = 0, total = 0, pf = 0, pt = 0;
+  for (let x = fromIso(se.start); iso(x) <= se.end; x.setDate(x.getDate() + 1)) {
+    const k = iso(x); if (dayOff(k)) continue;
+    const sl = slotsFor(k, 75, undefined, true), f = sl.filter(z => z.free).length;
+    free += f; total += sl.length; if (isPeak(k)) { pf += f; pt += sl.length; }
+  }
+  return { pct: Math.round((1 - free / total) * 100), peakPct: Math.round((1 - pf / pt) * 100) };
+}
+const seasonAccess = () => eligible() ? 'priority' : iso(new Date()) < season().publicOpens ? 'invite' : 'open';
+const dayOff = k => { const dt = fromIso(k); return dt.getDay() === 0 || (dt.getMonth() === 11 && (dt.getDate() === 24 || dt.getDate() === 25)) || (!isSeason(k) && hash(k + 'off') % 13 === 0); };
 /** Deterministic mock of other clients' appointments, as [startMin, endMin]. */
 function otherBookings(k) {
   let seed = hash(k); const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
-  const n = [3, 4, 4, 5, 2, 4, 5][seed % 7], out = [];
+  const n = Math.min(7, [3, 4, 4, 5, 2, 4, 5][seed % 7] + (isSeason(k) ? 2 + (isPeak(k) ? 1 : 0) : 0)), out = [];
   for (let i = 0; i < n; i++) { const st = (OPEN_H + Math.floor(rnd() * 10)) * 60; out.push([st, st + [60, 75, 90, 120][Math.floor(rnd() * 4)]]); }
   return out;
 }
@@ -227,8 +265,8 @@ function busyOn(k, ignoreId) {
     .map(b => [+b.time * 60, +b.time * 60 + (b.mins || pkgOf(b.pkg).mins)]);
   return otherBookings(k).concat(own);
 }
-function slotsFor(k, mins, ignoreId) {
-  if (dayOff(k)) return Array.from({ length: CLOSE_H - OPEN_H }, (_, i) => ({ h: OPEN_H + i, free: false }));
+function slotsFor(k, mins, ignoreId, raw) {
+  if (dayOff(k) || (!raw && seasonLocked(k))) return Array.from({ length: CLOSE_H - OPEN_H }, (_, i) => ({ h: OPEN_H + i, free: false }));
   const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), today = iso(now) === k, busy = busyOn(k, ignoreId), out = [];
   for (let h = OPEN_H; h < CLOSE_H; h++) {
     const st = h * 60, en = st + mins;
@@ -238,7 +276,7 @@ function slotsFor(k, mins, ignoreId) {
   return out;
 }
 const openCount = (k, mins, ign) => slotsFor(k, mins, ign).filter(s => s.free).length;
-const dayState = (k, mins, ign) => dayOff(k) ? 'off' : ({ 0: 'full', 1: 'few', 2: 'few', 3: 'few' }[openCount(k, mins, ign)] || 'open');
+const dayState = (k, mins, ign) => dayOff(k) ? 'off' : seasonLocked(k) ? 'locked' : ({ 0: 'full', 1: 'few', 2: 'few', 3: 'few' }[openCount(k, mins, ign)] || 'open');
 function nextOpenDate(from, mins, ign) {
   for (let i = 1; i <= 60; i++) { const x = fromIso(from); x.setDate(x.getDate() + i); if (openCount(iso(x), mins, ign)) return iso(x); }
   return null;
@@ -291,6 +329,11 @@ function letterFor() {
   if (hit) return occLetter(hit[0]);
   return !S.occasions.length && S.bookings.length ? `<div class="pad mt24"><a class="card row" href="#/occasions" style="border-color:var(--gold2)">${ic('gem')}<div class="grow small"><b>Let us remember for you</b><div class="muted">Tell us the dates that matter and Camille will write ahead each year.</div></div>${ic('chev')}</a></div>` : '';
 }
+function seasonBanner() {
+  const st = seasonStats(), acc = seasonAccess(), se = season();
+  return `<div class="stack mt24"><a class="season" href="#/season"><span class="tiny">The Holiday Season ${se.y}</span><b>The December diary is ${st.pct}% reserved</b>
+    <span class="small">${acc === 'priority' ? 'Priority access: you may reserve now.' : acc === 'invite' ? 'Returning clients may reserve now. Opens to all on ' + dayShort(se.publicOpens) + '.' : 'Open to everyone. Reserve early.'}</span></a></div>`;
+}
 route(/^$/, () => {
   const up = S.bookings.filter(b => b.status !== 'done' && b.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
   const last = S.bookings.filter(b => b.status === 'done').sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -303,14 +346,14 @@ route(/^$/, () => {
       <p class="tiny muted mt16">Manhattan · Brooklyn · Limited daily availability</p></div>
     ${installCard()}
     ${up ? `<span class="tiny eyebrow">Your next appointment</span><div class="stack mt8">${bookingCard(up)}</div>` : ''}
+    ${inviteBanner()}
     ${letterFor()}
     ${last ? `<div class="sec"><h3>Wrap again</h3></div><div class="stack"><button class="bk" data-act="rebook" data-id="${last.id}">${gift(last.palette)}<div class="grow"><b style="font-family:var(--serif);font-size:22px;font-weight:500">${pkgOf(last.pkg).name}</b>
       <div class="muted small">${last.gifts} gifts · ${palOf(last.palette).name} · ${money(last.total)}</div><span class="link">Book the same again</span></div></button></div>` : ''}
     <div class="sec"><h3>The collection</h3><a class="link" href="#/packages">View all</a></div>
     <div class="pkgrow">${PACKAGES.map((p, i) => `<button class="mini" data-act="start" data-pkg="${p.id}">
       ${gift(PALETTES[[1, 0, 3, 2][i]].id)}<b>${p.name}</b><span class="muted small">From ${money(p.price)}</span></button>`).join('')}</div>
-    <div class="stack mt24"><button class="season" data-act="start" data-pkg="signature"><span class="tiny">The holiday season</span><b>Reserve your December appointments</b>
-      <span class="small">Peak dates fill early. Book now for a Signature wrapping from ${money(95)}.</span></button></div>
+    ${seasonBanner()}
     <div class="sec"><h3>How it works</h3></div>
     <div class="how"><div><i>I</i><span><b>Select your package</b><span class="muted small">Choose a finish, your palette and any finishing touches.</span></span></div>
       <div><i>II</i><span><b>Reserve your time</b><span class="muted small">Pick a day and arrival time, share where we should come.</span></span></div>
@@ -363,22 +406,68 @@ route(/^customize$/, () => {
     `<a class="btn" href="#/schedule">Choose date &amp; time</a>`) };
 });
 
+/** Shown wherever a holiday date is requested before the diary opens to the public. */
+function lockedCard() {
+  const se = season(), on = (S.waitlist || {}).season;
+  return `<div class="pad"><div class="letter"><span class="tiny gold">By invitation</span>
+    <p style="font-size:21px">Camille’s holiday diary opens to returning clients first.</p>
+    <p class="small muted">It opens to everyone on ${dayLong(se.publicOpens)}. ${S.user ? 'Once you’ve booked with us, you’ll be invited early next season.' : 'Already a client? Sign in to reserve now.'}</p>
+    <div class="mt16" style="display:grid;gap:10px">${S.user ? '' : '<button class="btn" data-act="signin">Sign in to reserve</button>'}
+      <button class="btn ghost" data-act="season-notify">${on ? 'We’ll write when it opens ✓' : 'Notify me when it opens'}</button></div></div></div>`;
+}
+route(/^diary$/, () => {
+  const d = draft(), mins = durMins(d), todayK = iso(new Date()), ym = S.diaryMonth || d.date.slice(0, 7);
+  const [Y, M] = ym.split('-').map(Number), dim = new Date(Y, M, 0).getDate(), lead = new Date(Y, M - 1, 1).getDay();
+  const lastYm = iso(plusDays(120)).slice(0, 7), label = new Date(Y, M - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const cells = Array.from({ length: lead }, () => '<span></span>').concat(Array.from({ length: dim }, (_, i) => {
+    const k = `${ym}-${String(i + 1).padStart(2, '0')}`, past = k < todayK || k > iso(plusDays(120));
+    const st = past ? 'past' : dayState(k, mins, d.resched), pk = !past && isPeak(k) && (st === 'open' || st === 'few');
+    return `<button class="cell ${st} ${pk ? 'peak' : ''} ${k === d.date ? 'on' : ''}" ${past ? 'disabled' : ''} data-act="diary-pick" data-v="${k}"><b>${i + 1}</b><i></i></button>`;
+  })).join('');
+  return { html: `<div class="screen"><div class="topbar"><a class="iconbtn" href="#/schedule" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Camille’s diary</div></div>
+    <h1 class="title">Choose a date</h1><p class="sub">Appointment length for your order: ${durLabel(mins)}.</p>
+    <div class="pad"><div class="row between mb8"><button class="iconbtn" data-act="diary-month" data-v="-1" ${ym <= todayK.slice(0, 7) ? 'disabled style="opacity:.3"' : ''} aria-label="Previous month">${ic('back')}</button>
+      <h3 style="font-size:24px">${label}</h3><button class="iconbtn" data-act="diary-month" data-v="1" ${ym >= lastYm ? 'disabled style="opacity:.3"' : ''} aria-label="Next month">${ic('chev')}</button></div>
+      <div class="cal"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>${cells}</div>
+      <div class="legend"><span><i class="open"></i>Open</span><span><i class="few"></i>Few left</span><span><i class="full"></i>Full</span><span><i class="peak"></i>Peak</span><span><i class="locked"></i>Invitation</span></div></div>
+    <div class="pad mt24"><a class="season" href="#/season"><span class="tiny">The Holiday Season ${season().y}</span><b>Reserve early, with a little extra</b><span class="small">Priority access for returning clients · see the diary</span></a></div></div>` };
+});
+route(/^season$/, () => {
+  const se = season(), st = seasonStats(), acc = seasonAccess(), now = iso(new Date());
+  const row = (k, t, d) => `<div class="kv">${ic(k <= now ? 'check' : 'clock')}<div class="grow"><b>${t}</b><div class="muted small">${d}</div></div><span class="small ${k <= now ? 'muted' : 'gold'}">${dayShort(k)}</span></div>`;
+  return { html: `<div class="screen"><div class="topbar"><a class="iconbtn" href="#/" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">The Holiday Season</div></div>
+    <span class="tiny eyebrow">${se.y}</span><h1 class="title" style="padding-top:6px">Reserve Camille<br>before the diary closes.</h1>
+    <p class="sub">Every gift is wrapped by hand, by one person. We take a limited number of December appointments, and reserve them in good time.</p>
+    <div class="pad"><div class="letter"><span class="tiny gold">The December diary</span>
+      <p style="font-size:34px;margin-top:6px">${st.pct}% reserved</p><div class="bar" style="margin:12px 0"><i style="width:${st.pct}%"></i></div>
+      <p class="small muted">The week of ${dayShort(se.peakFrom)} to ${dayShort(se.end)} is ${st.peakPct}% reserved.</p></div></div>
+    <div class="pad mt16"><div class="card row">${ic(acc === 'open' ? 'sparkle' : acc === 'priority' ? 'gem' : 'clock')}<div class="grow small"><b>${acc === 'priority' ? 'Priority access: you may reserve now' : acc === 'open' ? 'The diary is open to everyone' : 'Opens to everyone on ' + dayShort(se.publicOpens)}</b>
+      <div class="muted">${acc === 'priority' ? 'Returning clients and Ribbon Circle members are invited first.' : acc === 'open' ? 'Dates are going quickly. We’d recommend reserving soon.' : 'Returning clients may reserve now. Sign in, or ask to be notified.'}</div></div></div></div>
+    <div class="sec"><h3>Key dates</h3></div><div class="pad">${row(se.priority, 'Priority diary opens', 'For returning clients and members')}${row(se.publicOpens, 'Opens to everyone', 'Reservations for all')}${row(se.earlyBy, 'Early reservation courtesy ends', 'Complimentary hand-lettered tags on every holiday date')}${row(se.changesUntil, 'Free changes until', 'After this, your deposit is retained')}${row(se.end, 'Final wrapping date', 'Camille is away on the 24th and 25th')}</div>
+    <div class="sec"><h3>How it works</h3></div><div class="pad"><ul class="checklist"><li>${ic('check')}A ${DEPOSIT_RATE * 100}% deposit secures your date. The balance is taken once Camille has finished.</li>
+      <li>${ic('check')}Peak dates (${dayShort(se.peakFrom)} to ${dayShort(se.end)}) carry a ${money(PEAK_FEE)} appointment fee, shown before you book.</li>
+      <li>${ic('check')}Reserve by ${dayShort(se.earlyBy)} and your hand-lettered gift tags are our compliment.</li></ul></div>
+    <div class="cta"><button class="btn" data-act="season-diary">Choose your date</button>${acc === 'invite' ? `<div class="actions mt8"><button class="btn ghost" data-act="signin">Sign in</button><button class="btn ghost" data-act="season-notify">${(S.waitlist || {}).season ? 'Notified ✓' : 'Notify me'}</button></div>` : ''}</div></div>` };
+});
+
 route(/^schedule$/, () => {
   const d = draft(), mins = durMins(d), ign = d.resched;
   if (!timeStillFree(d)) d.time = null;
-  const days = Array.from({ length: 21 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return x; });
+  const strip = Array.from({ length: 21 }, (_, i) => { const x = new Date(); x.setDate(x.getDate() + i); return x; });
+  const days = strip.some(x => iso(x) === d.date) ? strip : [fromIso(d.date), ...strip];
   const todayK = iso(new Date()), slots = slotsFor(d.date, mins, ign), open = slots.filter(s => s.free).length;
   const early = d.resched ? null : earliestToday(mins, ign), nextK = open ? null : nextOpenDate(d.date, mins, ign);
   const wl = (S.waitlist || {})[d.date];
-  const flag = k => ({ off: 'Closed', full: 'Full', few: 'Few left' }[dayState(k, mins, ign)]);
-  return { html: flow(2, d.resched ? 'Choose a<br>new time' : 'When should we<br>arrive?', 'Camille, our resident wrapper, takes a limited number of appointments each day.',
+  const flag = k => ({ off: 'Closed', full: 'Full', few: 'Few left', locked: 'Invite' }[dayState(k, mins, ign)] || (isPeak(k) ? 'Peak' : ''));
+  return { mount() { $('.day.on')?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, html: flow(2, d.resched ? 'Choose a<br>new time' : 'When should we<br>arrive?', 'Camille, our resident wrapper, takes a limited number of appointments each day.',
     `${early ? `<div class="pad mb8"><button class="asap ${d.date === todayK && d.time === String(early.h) ? 'on' : ''}" data-act="asap"><span class="bolt">${ic('bolt')}</span>
       <span class="grow"><b>Next available today · ${hourLabel(early.h)}</b><span class="muted small" style="display:block">Same-day priority · +${money(ASAP_FEE)}</span></span>${d.date === todayK && d.time === String(early.h) ? `<span class="check on">${ic('check')}</span>` : ''}</button></div>` : ''}
-    <div class="sec"><h3>Pick a day</h3><span class="muted small">Allow ${durLabel(mins)}</span></div>
+    <div class="sec"><h3>Pick a day</h3><span class="muted small">Allow ${durLabel(mins)} · <a class="link" href="#/diary">Full diary</a></span></div>
     <div class="days">${days.map(x => { const k = iso(x), f = flag(k); return `<button class="day ${d.date === k ? 'on' : ''} ${f ? 'flag' : ''}" data-act="day" data-v="${k}">
       <small>${x.toLocaleDateString('en-US', { weekday: 'short' })}</small><b>${x.getDate()}</b><small>${f || x.toLocaleDateString('en-US', { month: 'short' })}</small></button>`; }).join('')}</div>
-    <div class="sec"><h3>${d.date === todayK ? 'Today' : dayShort(d.date)}</h3><span class="muted small">${open ? open + ' time' + (open > 1 ? 's' : '') + ' open' : dayOff(d.date) ? 'Closed' : 'Fully booked'}</span></div>
-    ${open ? `<div class="slots">${slots.map(s => `<button class="slot ${d.time === String(s.h) ? 'on' : ''}" ${s.free ? '' : 'disabled'} data-act="slot" data-v="${s.h}">${hourLabel(s.h)}</button>`).join('')}</div>
+    <div class="sec"><h3>${d.date === todayK ? 'Today' : dayShort(d.date)}</h3><span class="muted small">${open ? open + ' time' + (open > 1 ? 's' : '') + ' open' : seasonLocked(d.date) ? 'By invitation' : dayOff(d.date) ? 'Closed' : 'Fully booked'}</span></div>
+    ${isSeason(d.date) ? `<p class="small muted pad mb8">${isPeak(d.date) ? '<b class="gold">Peak date · +' + money(PEAK_FEE) + '.</b> ' : ''}Holiday reservations include a ${DEPOSIT_RATE * 100}% deposit${earlyOpen() ? ' and, if you reserve by ' + dayShort(season().earlyBy) + ', complimentary hand-lettered tags' : ''}.</p>` : ''}
+    ${seasonLocked(d.date) ? lockedCard() : open ? `<div class="slots">${slots.map(s => `<button class="slot ${d.time === String(s.h) ? 'on' : ''}" ${s.free ? '' : 'disabled'} data-act="slot" data-v="${s.h}">${hourLabel(s.h)}</button>`).join('')}</div>
       ${d.date === todayK ? `<p class="small muted pad mt16">Same-day appointments include a ${money(ASAP_FEE)} priority fee.</p>` : ''}`
       : `<div class="pad"><div class="card center"><b style="font-family:var(--serif);font-size:21px;font-weight:500">${dayOff(d.date) ? 'Camille is away this day' : 'Camille is fully booked'}</b>
         <p class="muted small mt8">${dayOff(d.date) ? 'We’re closed on Sundays and occasional private-commission days.' : 'Every appointment is wrapped personally, so we can’t add more on this date.'}</p>
@@ -419,7 +508,7 @@ route(/^review$/, () => {
   const invalid = !d.address ? 'address' : !d.time ? 'schedule' : null;
   if (invalid) return { redirect: '#/' + invalid };
   const promoOk = PROMOS[(d.promo || '').toUpperCase()];
-  return { html: flow(4, 'Review &amp; book', 'Nothing is charged until your wrapper completes the job.',
+  return { html: flow(4, 'Review &amp; book', isSeason(d.date) ? 'A deposit secures your date. The balance is taken once Camille has finished.' : 'Nothing is charged until your wrapper completes the job.',
     `<div class="pad"><div class="card"><div class="row">${gift(d.palette, 64)}<div class="grow"><h3>${q.p.name}</h3>
       <div class="muted small">${d.gifts} gifts · ${d.occasion} · ${pal.name}</div></div><a class="link" href="#/customize">Edit</a></div>
       <div class="hline"></div>
@@ -446,13 +535,18 @@ route(/^review$/, () => {
       ${d.addons.map(id => { const a = ADDONS.find(x => x.id === id); return `<div class="line"><span>${a.name}</span><span>${money(a.price)}</span></div>`; }).join('')}
       ${q.asap ? `<div class="line"><span>Same-day priority</span><span>${money(q.asap)}</span></div>` : ''}
       ${q.perk ? `<div class="line disc"><span>Complimentary wax seal</span><span>−${money(q.perk)}</span></div>` : ''}
+      ${q.early ? `<div class="line disc"><span>Early reservation: hand-lettered tags</span><span>−${money(q.early)}</span></div>` : ''}
+      ${q.invite ? `<div class="line disc"><span>Invitation from ${esc(q.inviteFrom || 'a friend')}</span><span>−${money(q.invite)}</span></div>` : ''}
+      ${q.credit ? `<div class="line disc"><span>Ribbon credit</span><span>−${money(q.credit)}</span></div>` : ''}
+      ${q.peak ? `<div class="line"><span>Peak date</span><span>${money(q.peak)}</span></div>` : ''}
       ${q.discount ? `<div class="line disc"><span>Promo ${esc(d.promo.toUpperCase())}</span><span>−${money(q.discount)}</span></div>` : ''}
       <div class="line"><span>Service fee</span><span>${money(q.fee)}</span></div>
       <div class="line"><span>Tax</span><span>${money(q.tax)}</span></div>
       ${q.tip ? `<div class="line"><span>Tip</span><span>${money(q.tip)}</span></div>` : ''}
-      <div class="line tot"><span>Total</span><span>${money(q.total)}</span></div></div></div>
-    <p class="muted small pad mt16">Free cancellation up to 24 hours before your appointment.</p>`,
-    `<button class="btn" id="bookbtn" ${contactOk() ? '' : 'disabled'} data-act="book">${contactOk() ? 'Book · ' + money(q.total) : 'Add your details to book'}</button>`) };
+      <div class="line tot"><span>Total</span><span>${money(q.total)}</span></div>
+      ${depositOf(d, q) ? `<div class="line small"><span class="muted">Deposit due today (${DEPOSIT_RATE * 100}%)</span><b>${money(depositOf(d, q))}</b></div><div class="line small"><span class="muted">Balance after your appointment</span><span>${money(q.total - depositOf(d, q))}</span></div>` : ''}</div></div>
+    <p class="muted small pad mt16">${isSeason(d.date) ? `Holiday reservation: free changes until ${dayLong(season().changesUntil)}. After that, your deposit is retained.` : 'Free cancellation up to 24 hours before your appointment.'}</p>`,
+    `<button class="btn" id="bookbtn" ${contactOk() ? '' : 'disabled'} data-act="book">${contactOk() ? bookLabel(d) : 'Add your details to book'}</button>`) };
 });
 
 /* ---------- Install (PWA) ---------- */
@@ -526,13 +620,13 @@ route(/^bookings$/, () => {
 
 route(/^account$/, () => {
   const u = S.user, rows = u
-    ? [['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
-    : [['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
+    ? [['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['share', 'Introductions', S.credit > 0 ? 'Ribbon credit ' + money(S.credit) : 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
+    : [['share', 'Introductions', 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
   const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
   return { tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
     <div><h2 style="font-size:26px">${esc(u.name)}</h2><div class="muted small">${esc(u.email)}</div></div></div>
     <div class="card mt24 row between"><div><div class="tiny gold">Ribbon Circle</div><b>Member since ${new Date(u.since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
-      <div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed</div></div>${ic('sparkle')}</div>` :
+      <div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed${S.credit > 0 ? ' · Ribbon credit ' + money(S.credit) : ''}</div></div>${ic('sparkle')}</div>` :
     `<span class="tiny gold">Ribbon Circle</span><h1 style="font-size:34px;line-height:1.1;margin:6px 0 10px">Your details,<br>remembered.</h1>
     <p class="muted">You’re browsing as a guest. You never need an account to book, but one makes every visit faster.</p>
     <ul class="checklist mt16"><li>${ic('check')}Rebook a favourite wrap in one tap</li><li>${ic('check')}Saved addresses and payment cards</li><li>${ic('check')}First access to holiday appointments</li></ul>
@@ -585,7 +679,7 @@ function bookingView(b) {
         <p class="small mt16">${intro[b.status][1]}</p>
         <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`}</div>
     ${b.status === 'done' ? `<div class="sec"><h3>Rate your experience</h3></div><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div>` : ''}
-    ${b.status === 'done' && b.rating ? reviewBlock(b) : ''}
+    ${b.status === 'done' && b.rating ? reviewBlock(b) + introCard() : ''}
     <div class="sec"><h3>Your order</h3></div>
     <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div></div></div>
@@ -613,7 +707,7 @@ route(/^receipt\/([\w-]+)$/, id => {
   if (!b) return { redirect: '#/bookings' };
   const p = pkgOf(b.pkg), q = b.q, c = b.contact || {};
   const lines = q ? [[p.name, p.price], q.extra && [`${b.gifts - p.incl} extra gifts`, q.extra], ...(b.addons || []).map(id => { const a = ADDONS.find(x => x.id === id); return [a.name, a.price]; }),
-      q.asap && ['Same-day priority', q.asap], q.perk && ['Complimentary wax seal', -q.perk], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], ['Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
+      q.asap && ['Same-day priority', q.asap], q.perk && ['Complimentary wax seal', -q.perk], q.early && ['Early reservation: hand-lettered tags', -q.early], q.invite && [`Invitation from ${q.inviteFrom || 'a friend'}`, -q.invite], q.credit && ['Ribbon credit', -q.credit], q.peak && ['Peak date', q.peak], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], ['Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
     : [[p.name, p.price], ['Service, tax & gratuity', b.total - p.price]];
   return { html: `<div class="screen" style="padding-bottom:40px"><div class="topbar noprint"><a class="iconbtn" href="#/track/${b.id}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Receipt</div></div>
     <div class="pad"><div class="receipt"><div class="center"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div></div><div class="hline"></div>
@@ -623,7 +717,8 @@ route(/^receipt\/([\w-]+)$/, id => {
       <div class="row between small"><span class="muted">Location</span><span style="text-align:right;max-width:60%">${esc(b.address.line)}</span></div>
       <div class="row between small"><span class="muted">Paid with</span><span>${esc(([WALLET, ...PAYMENTS, ...S.cards].find(x => x.id === b.pay) || WALLET).name)}</span></div>
       <div class="hline"></div><div class="sum">${lines.map(([n, v]) => `<div class="line ${v < 0 ? 'disc' : ''}"><span>${n}</span><span>${v < 0 ? '−' : ''}${money(Math.abs(v))}</span></div>`).join('')}
-      <div class="line tot"><span>Total</span><span>${money(b.total)}</span></div></div>
+      <div class="line tot"><span>Total</span><span>${money(b.total)}</span></div>
+      ${b.deposit ? `<div class="line small"><span class="muted">Deposit paid</span><span>${money(b.deposit)}</span></div><div class="line small"><span class="muted">Balance ${b.status === 'done' ? 'paid' : 'due after your appointment'}</span><span>${money(b.total - b.deposit)}</span></div>` : ''}</div>
       <p class="muted small center mt24">${b.status === 'done' ? 'Paid in full. Thank you.' : b.status === 'cancelled' ? 'This booking was cancelled; no charge was made.' : 'Your card is charged once the service is completed.'}</p></div>
       <button class="btn mt24 noprint" data-act="print">Print or save as PDF</button></div></div>` };
 });
@@ -693,7 +788,7 @@ route(/^occasions$/, () => {
     ${list.length ? `<div class="stack">${list.map(([o]) => occCard(o)).join('')}</div>` : `<div class="empty" style="padding-top:20px">${gift('ivory')}<p class="mt16">No occasions yet.<br>Tell us a date that matters and we’ll remember it every year.</p></div>`}
     <div class="pad mt16"><button class="btn ghost" data-act="occ-add">${ic('plus')} Remember a new occasion</button></div>
     <div class="sec"><h3>The season of giving</h3></div>
-    <div class="stack"><button class="season" data-act="start" data-pkg="signature" data-occ="Holiday"><span class="tiny">Every December</span><b>Holiday wrapping</b><span class="small">Camille’s December diary opens first to those who’ve booked before.</span></button></div>
+    <div class="stack"><a class="season" href="#/season"><span class="tiny">Every December</span><b>Holiday wrapping</b><span class="small">Camille’s December diary opens first to those who’ve booked before.</span></a></div>
     <div class="sec"><h3>How we remember</h3></div>
     <div class="how"><div><i>I</i><span><b>You tell us once</b><span class="muted small">Add a date when you book, or here, at any time.</span></span></div>
       <div><i>II</i><span><b>We write ahead</b><span class="muted small">A personal note arrives three weeks before, with Camille’s availability.</span></span></div>
@@ -727,6 +822,40 @@ function occSheet(id) {
       ${o ? `<button class="btn danger" data-act="occ-del" data-id="${id}">Remove</button>` : ''}</div>`);
 }
 let pendKind = 'Birthday';
+
+/* ---------- Introductions: a private invitation, not a referral link ---------- */
+const refCode = () => { const u = S.user; return (u ? u.name.split(' ')[0] : 'GUEST').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) + '-' + hash(u?.email || 'guest').toString(36).toUpperCase().slice(0, 4); };
+const inviteLink = () => `${location.origin}${location.pathname}?invite=${refCode()}`;
+const inviteText = () => `${S.user.name.split(' ')[0]} has invited you to Ribbon & Co., a private gift-wrapping atelier. Your first appointment with Camille includes ${money(INVITE_CREDIT)} on us.`;
+function inviteCard(code, from) {
+  return `<div class="letter"><span class="tiny gold">Ribbon &amp; Co.</span><p class="hello">You are warmly invited</p><p class="small muted">by ${esc(from)}</p>
+    <div class="code">${esc(code)}</div><p class="small muted">to a first appointment with Camille, with ${money(INVITE_CREDIT)} on us.</p></div>`;
+}
+/** Shown to a new client who arrived through an invitation. */
+function inviteBanner() {
+  const i = S.invite; if (!i || i.used || S.bookings.length) return '';
+  return `<div class="pad mt24"><div class="letter"><span class="tiny gold">An invitation</span><p style="font-size:22px">${esc(i.from)} has invited you to Ribbon &amp; Co.</p>
+    <p class="small muted">${money(INVITE_CREDIT)} is waiting for your first appointment with Camille. It will be applied at checkout.</p><button class="btn mt16" data-act="start">Reserve Camille</button></div></div>`;
+}
+const introCard = () => `<div class="pad mt16"><a class="card row" href="#/introductions" style="border-color:var(--gold2)">${ic('share')}<div class="grow small"><b>Introduce a friend</b><div class="muted">You each receive ${money(INVITE_CREDIT)} towards a Ribbon &amp; Co. appointment.</div></div>${ic('chev')}</a></div>`;
+route(/^introductions$/, () => {
+  const u = S.user, done = S.referrals.filter(r => r.status === 'completed').length;
+  const tiers = [[1, `${money(INVITE_CREDIT)} Ribbon credit for each introduction`], [3, 'A complimentary fresh floral accent on a future appointment'], [5, 'An evening with Camille: a private wrapping masterclass for you and four friends']];
+  const pill = r => `<span class="status ${r.status === 'completed' ? 'done' : ''}">${{ invited: 'Invited', booked: 'Booked', completed: 'Completed' }[r.status]}</span>`;
+  return sub('Introductions', 'Camille’s clients are, almost always, introduced by a friend. You each receive ' + money(INVITE_CREDIT) + '.',
+    u ? `<div class="pad">${inviteCard(refCode(), u.name)}
+      <div class="actions mt16"><button class="btn" data-act="share-invite">Send invitation</button><button class="btn ghost" data-act="copy-invite">Copy link</button></div>
+      <p class="center mt16"><a class="link" data-act="invite-preview">See what your friend sees</a></p></div>
+      <div class="sec"><h3>Your introductions</h3><span class="gold">${S.credit > 0 ? money(S.credit) + ' credit' : ''}</span></div>
+      <div class="pad">${S.referrals.length ? S.referrals.map(r => `<div class="kv">${ic('user')}<div class="grow"><b>${esc(r.name)}</b><div class="muted small">${r.status === 'completed' ? `${money(INVITE_CREDIT)} credited` : 'Credit arrives after their first appointment'}</div></div>${pill(r)}</div>`).join('') : '<p class="muted small">No introductions yet. Your invitation is ready to send.</p>'}
+        <button class="previewlink" data-act="ref-demo">Demo: simulate a friend’s progress ›</button></div>
+      <div class="sec"><h3>The Circle</h3></div><div class="pad">${tiers.map(([n, t]) => `<div class="kv">${ic(done >= n ? 'check' : 'gem')}<div class="grow"><b>${n === 1 ? 'First introduction' : n + ' introductions'}</b><div class="muted small">${t}</div></div><span class="small ${done >= n ? 'muted' : 'gold'}">${done >= n ? 'Unlocked' : Math.min(done, n) + '/' + n}</span></div>`).join('')}</div>
+      <p class="muted small pad mt24">Credit is added when your guest’s first appointment is complete, and is applied automatically to your next booking. Invitations are for new clients only.</p>`
+    : `<div class="pad"><div class="letter"><span class="tiny gold">Ribbon Circle</span><p style="font-size:22px">Every member holds a private invitation.</p>
+      <p class="small muted">Create your account to receive your personal invitation and ${money(INVITE_CREDIT)} for each friend you introduce.</p>
+      <button class="btn mt16" data-act="signup">Create an account</button><button class="btn ghost mt8" data-act="signin">Sign in</button></div></div>
+      <p class="center mt16"><a class="link" data-act="invite-preview">See what your friend would receive</a></p>`);
+});
 
 /* ---------- Account sub-pages ---------- */
 const sub = (title, intro, body, back = '#/account') => ({ html: `<div class="screen"><div class="topbar"><a class="iconbtn" href="${back}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Account</div></div>
@@ -809,9 +938,9 @@ const actions = {
   occasion(el) { draft().occasion = el.dataset.v; save(); render(); },
   palette(el) { draft().palette = el.dataset.id; save(); render(); },
   addon(el) { const d = draft(), i = d.addons.indexOf(el.dataset.id); i < 0 ? d.addons.push(el.dataset.id) : d.addons.splice(i, 1); save(); render(); },
-  day(el) { const d = draft(); d.date = el.dataset.v; if (!timeStillFree(d)) d.time = null; save(); render(); const a = $('.day.on'); a && a.scrollIntoView({ inline: 'center', block: 'nearest' }); },
+  day(el) { const d = draft(); d.date = el.dataset.v; if (!timeStillFree(d)) d.time = null; syncEarly(d); save(); render(); const a = $('.day.on'); a && a.scrollIntoView({ inline: 'center', block: 'nearest' }); },
   waitlist(el) { S.waitlist ||= {}; S.waitlist[el.dataset.v] = !S.waitlist[el.dataset.v]; save(); render(); toast(S.waitlist[el.dataset.v] ? 'We’ll message you if a time opens' : 'Removed from waiting list'); },
-  slot(el) { draft().time = el.dataset.v; save(); render(); },
+  slot(el) { const d = draft(); d.time = el.dataset.v; syncEarly(d); save(); render(); },
   asap() { const d = draft(), e = earliestToday(durMins(d), d.resched); if (!e) return; d.date = iso(new Date()); d.time = String(e.h); save(); render(); },
   saved(el) { draft().address = { ...S.saved[+el.dataset.i] }; save(); render(); },
   place(el) { draft().address = { label: 'New address', line: el.dataset.v, unit: '' }; save(); render(); },
@@ -823,12 +952,14 @@ const actions = {
     if (!contactOk()) return;
     const d = draft(), q = quote(d);
     const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
-      contact: { ...S.contact }, q: (({ extra, addons, asap, discount, perk, fee, tax, tip, total }) => ({ extra, addons, asap, discount, perk, fee, tax, tip, total, promo: d.promo }))(q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+      contact: { ...S.contact }, q: (({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total }) => ({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total, promo: d.promo }))(q), deposit: depositOf(d, q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
     const snap = { date: b.date, pkg: b.pkg, gifts: b.gifts, palette: b.palette, addons: b.addons, items: b.items, address: b.address, total: b.total };
     let o = d.occId && S.occasions.find(x => x.id === d.occId);
     if (o) (o.history ||= []).push(snap);
     else if (d.remember && d.remDate && (d.remWho.trim() || d.occasion !== 'Birthday')) { o = { id: 'o' + Date.now(), kind: d.occasion, who: d.remWho.trim(), date: d.remDate, history: [snap] }; S.occasions.push(o); }
     if (o) b.occId = o.id;
+    if (q.invite) S.invite.used = true;
+    if (q.credit) S.credit = Math.round((S.credit - q.credit) * 100) / 100;
     S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
     location.hash = '#/confirmed/' + b.id;
   },
@@ -850,8 +981,9 @@ const actions = {
     setTimeout(() => m && m.insertAdjacentHTML('beforeend', '<div class="bubble them">Perfect, thank you! 🎀</div>'), 900);
   },
   cancel(el) {
-    openSheet(`<h3>Cancel this booking?</h3><p class="muted small mb8">Free cancellation up to 24 hours before. Your card won’t be charged.</p>
-      <button class="btn danger mt16" data-act="cancel-yes" data-id="${el.dataset.id}">Yes, cancel booking</button><button class="btn ghost mt8" data-act="close">Keep booking</button>`);
+    { const b = S.bookings.find(x => x.id === el.dataset.id), late = b.deposit && iso(new Date()) > season().changesUntil;
+    openSheet(`<h3>Cancel this booking?</h3><p class="muted small mb8">${late ? `Holiday reservations can’t be refunded after ${dayShort(season().changesUntil)}. Your deposit of ${money(b.deposit)} would be retained.` : 'Free cancellation up to 24 hours before. Your card won’t be charged.'}</p>
+      <button class="btn danger mt16" data-act="cancel-yes" data-id="${el.dataset.id}">Yes, cancel booking</button><button class="btn ghost mt8" data-act="close">Keep booking</button>`); }
   },
   'cancel-yes'(el) { closeSheet(); setStatus(el.dataset.id, 'cancelled'); toast('Booking cancelled'); },
   close() { closeSheet(); },
@@ -1007,6 +1139,32 @@ const actions = {
     for (let i = 0; i < Math.min(nx.days, 60); i++) { const k = iso(plusDays(i)); if (openCount(k, mins)) { d.date = k; break; } }
     S.draft = d; save(); location.hash = '#/customize';
   },
+  'diary-month'(el) { const d = draft(), [Y, M] = (S.diaryMonth || d.date.slice(0, 7)).split('-').map(Number), x = new Date(Y, M - 1 + +el.dataset.v, 1); S.diaryMonth = iso(x).slice(0, 7); save(); render(); },
+  'diary-pick'(el) {
+    const d = draft(), k = el.dataset.v;
+    if (seasonLocked(k)) { d.date = k; save(); openSheet(lockedCard()); return; }
+    d.date = k; if (!timeStillFree(d)) d.time = null; syncEarly(d); save(); location.hash = '#/schedule';
+  },
+  'season-diary'() { draft(); S.diaryMonth = season().start.slice(0, 7); save(); location.hash = '#/diary'; },
+  'season-notify'() { S.waitlist ||= {}; S.waitlist.season = !S.waitlist.season; save(); render(); toast(S.waitlist.season ? 'We’ll write when the diary opens' : 'Removed'); },
+  async 'share-invite'() {
+    const text = inviteText();
+    try { if (navigator.share) { await navigator.share({ title: 'An invitation to Ribbon & Co.', text, url: inviteLink() }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(text + ' ' + inviteLink()); toast('Invitation copied'); } catch { toast('Sharing isn’t available here'); }
+  },
+  async 'copy-invite'() { try { await navigator.clipboard.writeText(inviteLink()); toast('Link copied'); } catch { toast(inviteLink()); } },
+  'invite-preview'() {
+    const from = S.user ? S.user.name : 'A friend', code = S.user ? refCode() : 'FRIEND-0000';
+    openSheet(`<span class="tiny gold">What your friend receives</span><div class="mt16">${inviteCard(code, from)}</div>
+      <p class="muted small center mt16">They’re welcomed on their first visit, and ${money(INVITE_CREDIT)} is applied automatically at checkout.</p><button class="btn ghost mt16" data-act="close">Close</button>`);
+  },
+  'ref-demo'() {
+    const r = S.referrals.find(x => x.status !== 'completed');
+    if (!r) S.referrals.unshift({ id: 'r' + Date.now(), name: 'Sophie L.', status: 'invited', date: iso(new Date()) });
+    else if (r.status === 'invited') { r.status = 'booked'; toast(r.name + ' has booked'); }
+    else { r.status = 'completed'; S.credit = Math.round((S.credit + INVITE_CREDIT) * 100) / 100; toast(money(INVITE_CREDIT) + ' credited to your account'); }
+    save(); render();
+  },
   soon() { toast('Not part of this demo'); },
   reset() {
     openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>
@@ -1034,10 +1192,18 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.bind; if (!k) return;
   bind(k, e.target.value);
-  const btn = $('#bookbtn'); if (btn) { const ok = contactOk(); btn.disabled = !ok; btn.textContent = ok ? 'Book · ' + money(quote(draft()).total) : 'Add your details to book'; }
+  const btn = $('#bookbtn'); if (btn) { const ok = contactOk(); btn.disabled = !ok; btn.textContent = ok ? bookLabel(draft()) : 'Add your details to book'; }
 });
 
 /* ---------- Boot ---------- */
+try {
+  const code = new URLSearchParams(location.search).get('invite');
+  if (code) {
+    const c = code.toUpperCase(), from = c.split('-')[0].charAt(0) + c.split('-')[0].slice(1).toLowerCase();
+    if (!(S.user && refCode() === c)) { S.invite = { code: c, from, used: false }; save(); }
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+} catch { /* ignore */ }
 if (!location.hash) location.replace('#/');
 render();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { /* offline support optional */ });

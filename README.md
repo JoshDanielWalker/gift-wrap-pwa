@@ -59,3 +59,13 @@ The retention loop, written in a jeweller's voice rather than a discount-code on
 - **Reserve in one tap**: pre-fills last year's package, palette, gifts, address and finishing touches, picks the first open date before the occasion, suggests something new, and includes a **complimentary monogram wax seal** for returning traditions.
 - **Confirmation** celebrates the tradition ("Year 2 together"); receipts itemise the complimentary seal. Reminders can be switched off under Notifications.
 - Demo account has three sample occasions dated relative to today (Mum's 70th in 12 days, a Silver anniversary, Eleanor's birthday).
+
+## The Holiday Season: a reservation event, not a rush
+- **Invitation first**: returning clients and members can reserve the December diary now; everyone else from Nov 1 (guests see a locked-date card with *Sign in* and *Notify me*).
+- **Honest scarcity**: the diary shows how much of December (and the peak week) is genuinely reserved, from Camille's single calendar.
+- **Deposit, not surge pricing**: holiday dates take a 25% deposit; the balance is taken after the service. Peak dates (Dec 17–23) carry a clearly labelled $40 appointment fee. Camille is away on the 24th and 25th.
+- **Reserve early**: complimentary hand-lettered tags on any holiday date reserved by Nov 15; free changes until Nov 24, after which the deposit is retained.
+- **Diary calendar** (`#/diary`): month view of Camille's availability with Open / Few left / Full / Peak / Invitation states, reachable from the schedule step and the season page (`#/season`).
+
+## Introductions (referrals)
+A private invitation rather than a referral link: each member has a personal code and an engraved-style invitation card. A friend arriving via `?invite=CODE` is welcomed on Home and receives $30 off their first appointment; the member earns $30 Ribbon credit when the friend's first appointment completes, applied automatically at checkout. A "Circle" ladder rewards 3 and 5 introductions. Prompted after a completed, rated booking and from the Account tab; *Demo: simulate a friend's progress* walks a friend through invited → booked → completed.
