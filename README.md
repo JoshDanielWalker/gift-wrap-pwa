@@ -69,3 +69,9 @@ The retention loop, written in a jeweller's voice rather than a discount-code on
 
 ## Introductions (referrals)
 A private invitation rather than a referral link: each member has a personal code and an engraved-style invitation card. A friend arriving via `?invite=CODE` is welcomed on Home and receives $30 off their first appointment; the member earns $30 Ribbon credit when the friend's first appointment completes, applied automatically at checkout. A "Circle" ladder rewards 3 and 5 introductions. Prompted after a completed, rated booking and from the Account tab; *Demo: simulate a friend's progress* walks a friend through invited → booked → completed.
+
+## Also in the demo
+- **Letters**: a quiet in-app inbox (booking updates, Camille's notes, season invitation, credit earned) with an unread dot on the Account tab.
+- **Gift card redemption**: enter a purchased `RC-XXXX-XXXX` code in the promo field at checkout and its value becomes Ribbon credit (single use, works across accounts on the same device).
+- **Gratuity after service**: optional $10 / $20 / $40 on a completed booking, shown on the receipt.
+- **Accessibility**: visible focus rings, Esc closes dialogs and returns focus.

@@ -123,7 +123,7 @@ function gift(palId, size) {
 const KEY = 'ribbon-demo-v3', ACC_KEY = 'ribbon-accounts-v1';
 const DEFAULT_PREFS = () => ({ sms: true, email: true, holiday: false, occ: true });
 /** A visitor starts as a guest: nothing saved, nothing required. */
-const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, credit: 0, referrals: [], invite: null, bookings: [], occasions: [], saved: [], cards: [], giftcards: [],
+const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, letters: [], credit: 0, referrals: [], invite: null, bookings: [], occasions: [], saved: [], cards: [], giftcards: [],
   prefs: DEFAULT_PREFS(), waitlist: {}, bkTab: 'up' });
 const plusDays = n => { const x = new Date(); x.setDate(x.getDate() + n); return x; };
 /** Sample remembered occasions, dated relative to today so the demo always has something upcoming. */
@@ -146,12 +146,14 @@ function returningClient() {
   });
   return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8)],
     saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), occasions: demoOccasions(), credit: 30,
+    letters: [{ id: 'l1', ts: Date.now() - 86400000 * 2, kind: 'season', title: 'The December diary is open to you', body: 'As one of Camille’s returning clients, you may reserve the holiday diary before it opens to everyone on 1 November. Peak dates fill first.', link: '#/season', read: false },
+      { id: 'l2', ts: Date.now() - 86400000 * 12, kind: 'welcome', title: 'Welcome to Ribbon Circle', body: 'Thank you for joining us. Your addresses, payment cards and remembered occasions are kept safe, and your invitation to share with friends is ready.', link: '#/introductions', read: true }],
     referrals: [{ id: 'r1', name: 'Eleanor R.', status: 'completed', date: iso(plusDays(-40)) }, { id: 'r2', name: 'Marcus T.', status: 'invited', date: iso(plusDays(-3)) }] };
 }
 let S, ACC;
 try { S = JSON.parse(localStorage.getItem(KEY)) || guestState(); } catch { S = guestState(); }
 try { ACC = JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch { ACC = {}; }
-const ACCT_FIELDS = ['user', 'contact', 'credit', 'referrals', 'bookings', 'occasions', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
+const ACCT_FIELDS = ['user', 'contact', 'letters', 'credit', 'referrals', 'bookings', 'occasions', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
 const save = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify(S));
@@ -170,13 +172,14 @@ function createAccount({ name, email, phone }) {
 }
 function signIn(email) {
   email = email.trim().toLowerCase();
-  const guestBookings = S.user ? [] : S.bookings, guestOcc = S.user ? [] : S.occasions, draft = S.draft;
+  const guestBookings = S.user ? [] : S.bookings, guestOcc = S.user ? [] : S.occasions, guestCredit = S.user ? 0 : S.credit, guestLetters = S.user ? [] : S.letters || [], draft = S.draft;
   const acct = ACC[email] || (email === DEMO_EMAIL
     ? { ...guestState(), ...returningClient(), user: { name: 'Josh Walker', email, phone: '(212) 555-0142', since: Date.now() - 86400000 * 120 } }
     : { ...guestState(), user: { name: nameFromEmail(email), email, phone: S.contact.phone || '', since: Date.now() } });
   S = { ...guestState(), ...acct, draft, invite: S.invite, bkTab: 'up' };
   S.bookings = [...guestBookings, ...(acct.bookings || [])];
   S.occasions = [...guestOcc, ...(acct.occasions || [])];
+  S.credit = (acct.credit || 0) + (guestCredit || 0); S.letters = [...guestLetters, ...(acct.letters || [])];
   S.contact = { name: S.user.name, email, phone: S.user.phone || '' }; save();
 }
 function signOut() { save(); S = guestState(); save(); }
@@ -189,6 +192,18 @@ function firstOpenDate(mins = 75, ign) {
     if (openCount(iso(d), mins, ign)) return iso(d);
   }
   return iso(new Date());
+}
+/** Gift cards live in a device-wide registry so a code bought in one account can be redeemed in another. */
+function giftRegistry(code, set) {
+  let r = {}; try { r = JSON.parse(localStorage.getItem('ribbon-giftcards')) || {}; } catch { r = {}; }
+  if (set) { r[code] = set; try { localStorage.setItem('ribbon-giftcards', JSON.stringify(r)); } catch { /* ignore */ } }
+  return r[code];
+}
+function redeemGift(code) {
+  code = (code || '').trim().toUpperCase(); const g = /^RC-/.test(code) && giftRegistry(code);
+  if (!g || g.redeemed) return 0;
+  giftRegistry(code, { ...g, redeemed: true }); S.credit = Math.round(((S.credit || 0) + g.amount) * 100) / 100; save();
+  return g.amount;
 }
 /** Early-reservation courtesy: complimentary hand-lettered tags on holiday dates booked in good time. */
 function syncEarly(d) {
@@ -294,15 +309,19 @@ function toast(msg) {
 function openSheet(html, onMount) {
   closeSheet();
   const bg = document.createElement('div'); bg.id = 'sheetbg';
-  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Dialog">${html}</div>`;
   bg.addEventListener('click', e => { if (e.target === bg) closeSheet(); });
+  sheetOpener = document.activeElement;
   $('#shell').appendChild(bg);
+  bg.querySelector('input,textarea,button,a')?.focus({ preventScroll: true });
   onMount && onMount(bg);
 }
-function closeSheet() { $('#sheetbg')?.remove(); }
+let sheetOpener = null;
+function closeSheet() { const had = $('#sheetbg'); had?.remove(); if (had && sheetOpener?.isConnected) sheetOpener.focus({ preventScroll: true }); sheetOpener = null; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
 function tabbar(active) {
-  const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}">${ic(n)}${l}</a>`;
+  const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}">${ic(n)}${l}${h === 'account' && unread() ? '<i class="badge-dot" aria-label="Unread letters"></i>' : ''}</a>`;
   return `<nav class="tabs">${t('', 'home', 'Home')}${t('occasions', 'gem', 'Occasions')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
 }
 const STEPS = ['packages', 'customize', 'schedule', 'address', 'review'];
@@ -526,7 +545,7 @@ route(/^review$/, () => {
     <div class="sec"><h3>Payment</h3></div><div class="stack">${[WALLET, ...S.cards].map(p => `<button class="pay ${d.pay === p.id ? 'on' : ''}" data-act="pay" data-id="${p.id}"><span class="cardlogo">${p.logo}</span>
       <span class="grow">${p.name}</span><span class="check ${d.pay === p.id ? 'on' : ''}">${ic('check')}</span></button>`).join('')}
       <button class="pay" data-act="card-add"><span class="cardlogo">${ic('plus')}</span><span class="grow">Add a payment method</span></button></div>
-    <div class="sec"><h3>Promo code</h3></div><div class="pad row"><label class="field grow"><span>Code</span><input id="promo" value="${esc(d.promo)}" placeholder="Try WRAP10" autocapitalize="characters"></label>
+    <div class="sec"><h3>Promo or gift card</h3></div><div class="pad row"><label class="field grow"><span>Code</span><input id="promo" value="${esc(d.promo)}" placeholder="Promo or gift card code" autocapitalize="characters"></label>
       <button class="btn sm ghost" data-act="promo">Apply</button></div>
     ${d.promo ? `<p class="small pad mt8 ${promoOk ? 'gold' : ''}" style="${promoOk ? '' : 'color:var(--danger)'}">${promoOk ? `${promoOk * 100}% off applied` : 'That code isn’t valid'}</p>` : ''}
     <div class="sec"><h3>Summary</h3></div><div class="pad"><div class="card sum">
@@ -620,7 +639,7 @@ route(/^bookings$/, () => {
 
 route(/^account$/, () => {
   const u = S.user, rows = u
-    ? [['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['share', 'Introductions', S.credit > 0 ? 'Ribbon credit ' + money(S.credit) : 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
+    ? [['chat', 'Letters', unread() ? unread() + ' unread' : 'Notes from Camille', 'letters'], ['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['share', 'Introductions', S.credit > 0 ? 'Ribbon credit ' + money(S.credit) : 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
     : [['share', 'Introductions', 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
   const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
   return { tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
@@ -649,6 +668,12 @@ function countdown(b) {
   return days <= 0 ? 'Today at ' + hourLabel(+b.time) : days === 1 ? 'Tomorrow' : `In ${days} days`;
 }
 /** Written review: prompt after rating, then show it back. */
+function gratuityBlock(b) {
+  if (b.tipAfter < 0) return '';
+  return b.tipAfter ? `<div class="pad mt16"><div class="card row">${ic('check')}<div class="grow small"><b>${money(b.tipAfter)} gratuity added</b><div class="muted">Thank you. It goes entirely to Camille.</div></div></div></div>`
+    : `<div class="pad mt16"><div class="card"><b style="font-family:var(--serif);font-size:20px;font-weight:500">Add a gratuity for Camille</b><p class="muted small mt8">Entirely optional, and goes directly to her.</p>
+      <div class="tips mt16">${[10, 20, 40].map(v => `<button data-act="tip-after" data-id="${b.id}" data-v="${v}">${money(v)}</button>`).join('')}<button data-act="tip-after" data-id="${b.id}" data-v="0">Not now</button></div></div></div>`;
+}
 function reviewBlock(b) {
   return b.review ? `<div class="pad mt16"><div class="card"><div class="tiny muted">Your review</div><p class="mt8" style="font-family:var(--serif);font-size:19px;font-style:italic">“${esc(b.review)}”</p></div></div>`
     : `<div class="pad mt16"><label class="field"><span>Tell us more (optional)</span><textarea id="rv" rows="3" placeholder="What did you love?"></textarea></label>
@@ -679,6 +704,7 @@ function bookingView(b) {
         <p class="small mt16">${intro[b.status][1]}</p>
         <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`}</div>
     ${b.status === 'done' ? `<div class="sec"><h3>Rate your experience</h3></div><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div>` : ''}
+    ${b.status === 'done' ? gratuityBlock(b) : ''}
     ${b.status === 'done' && b.rating ? reviewBlock(b) + introCard() : ''}
     <div class="sec"><h3>Your order</h3></div>
     <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
@@ -718,6 +744,7 @@ route(/^receipt\/([\w-]+)$/, id => {
       <div class="row between small"><span class="muted">Paid with</span><span>${esc(([WALLET, ...PAYMENTS, ...S.cards].find(x => x.id === b.pay) || WALLET).name)}</span></div>
       <div class="hline"></div><div class="sum">${lines.map(([n, v]) => `<div class="line ${v < 0 ? 'disc' : ''}"><span>${n}</span><span>${v < 0 ? '−' : ''}${money(Math.abs(v))}</span></div>`).join('')}
       <div class="line tot"><span>Total</span><span>${money(b.total)}</span></div>
+      ${b.tipAfter > 0 ? `<div class="line small"><span class="muted">Gratuity added after your appointment</span><span>${money(b.tipAfter)}</span></div>` : ''}
       ${b.deposit ? `<div class="line small"><span class="muted">Deposit paid</span><span>${money(b.deposit)}</span></div><div class="line small"><span class="muted">Balance ${b.status === 'done' ? 'paid' : 'due after your appointment'}</span><span>${money(b.total - b.deposit)}</span></div>` : ''}</div>
       <p class="muted small center mt24">${b.status === 'done' ? 'Paid in full. Thank you.' : b.status === 'cancelled' ? 'This booking was cancelled; no charge was made.' : 'Your card is charged once the service is completed.'}</p></div>
       <button class="btn mt24 noprint" data-act="print">Print or save as PDF</button></div></div>` };
@@ -857,6 +884,16 @@ route(/^introductions$/, () => {
       <p class="center mt16"><a class="link" data-act="invite-preview">See what your friend would receive</a></p>`);
 });
 
+/* ---------- Letters: a quiet in-app correspondence ---------- */
+function addLetter(kind, title, body, link) {
+  (S.letters ||= []).unshift({ id: 'l' + Date.now() + Math.random().toString(36).slice(2, 5), ts: Date.now(), kind, title, body, link, read: false }); save();
+}
+const unread = () => (S.letters || []).filter(l => !l.read).length;
+route(/^letters$/, () => sub('Letters', 'Notes from Camille and the atelier, kept in one place.',
+  `<div class="pad">${(S.letters || []).length ? S.letters.map(l => `<button class="letterrow ${l.read ? '' : 'new'}" data-act="letter-open" data-id="${l.id}"><span class="dot"></span><span class="grow"><b>${esc(l.title)}</b>
+    <span class="muted small" style="display:block">${new Date(l.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>${l.open ? `<span class="small" style="display:block;margin-top:8px;color:var(--text)">${esc(l.body)}</span>${l.link ? `<a class="link" style="display:inline-block;margin-top:10px" href="${l.link}">View</a>` : ''}` : ''}</span></button>`).join('') : '<p class="muted">No letters yet. We write when something is worth saying.</p>'}</div>
+    ${unread() ? '<div class="pad mt16"><button class="btn ghost sm" style="width:100%" data-act="letters-read">Mark all as read</button></div>' : ''}`));
+
 /* ---------- Account sub-pages ---------- */
 const sub = (title, intro, body, back = '#/account') => ({ html: `<div class="screen"><div class="topbar"><a class="iconbtn" href="${back}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Account</div></div>
   <h1 class="title">${title}</h1><p class="sub">${intro}</p>${body}</div>` });
@@ -947,7 +984,11 @@ const actions = {
   locate() { draft().address = { label: 'Current location', line: '350 5th Ave, New York, NY 10118', unit: '' }; save(); toast('Location found'); render(); },
   tip(el) { draft().tip = +el.dataset.v; save(); render(); },
   pay(el) { draft().pay = el.dataset.id; save(); render(); },
-  promo() { draft().promo = $('#promo').value.trim(); save(); render(); },
+  promo() {
+    const v = $('#promo').value.trim(), amt = redeemGift(v);
+    draft().promo = amt ? '' : v; save(); render();
+    if (amt) { toast(`${money(amt)} gift card added to your Ribbon credit`); }
+  },
   book() {
     if (!contactOk()) return;
     const d = draft(), q = quote(d);
@@ -960,6 +1001,7 @@ const actions = {
     if (o) b.occId = o.id;
     if (q.invite) S.invite.used = true;
     if (q.credit) S.credit = Math.round((S.credit - q.credit) * 100) / 100;
+    addLetter('booking', 'Your appointment is reserved', `${pkgOf(b.pkg).name} on ${dayLong(b.date)} at ${hourLabel(+b.time)}. Camille will write to you the day before.`, '#/track/' + b.id);
     S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
     location.hash = '#/confirmed/' + b.id;
   },
@@ -967,8 +1009,8 @@ const actions = {
   advance(el) {
     const b = S.bookings.find(x => x.id === el.dataset.id), i = STAGES.findIndex(s => s.id === b.status);
     setStatus(b.id, STAGES[Math.min(i + 1, STAGES.length - 1)].id);
-    const msg = { assigned: 'Camille has been assigned', today: 'Camille is on her way', done: 'All wrapped!' }[b.status];
-    msg && toast(msg);
+    const msg = { assigned: 'Camille has prepared your order', today: 'Camille is on her way', done: 'All wrapped!' }[b.status];
+    if (msg) { toast(msg); addLetter('booking', msg, { assigned: 'Everything is ready for your appointment. See you soon.', today: 'Please have your gifts gathered in one place. She will message on arrival.', done: 'We hope they love it. If you have a moment, a few words from you mean a great deal to Camille.' }[b.status], '#/track/' + b.id); }
   },
   rate(el) { const b = S.bookings.find(x => x.id === el.dataset.id); b.rating = +el.dataset.v; save(); render(); toast('Thanks for the feedback'); },
   call() { toast('Calling Camille… (demo)'); },
@@ -1063,7 +1105,8 @@ const actions = {
   'gc-buy'() {
     const amt = +document.querySelector('[data-act=gc-amt].on').dataset.v, to = $('#gc-to').value.trim();
     if (!to) { toast('Add the recipient’s name'); return; }
-    S.giftcards.unshift({ id: Date.now(), amount: amt, to, msg: $('#gc-msg').value, code: 'RC-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase() });
+    const gc = { id: Date.now(), amount: amt, to, msg: $('#gc-msg').value, code: 'RC-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase() };
+    S.giftcards.unshift(gc); giftRegistry(gc.code, { amount: amt, redeemed: false });
     save(); render(); toast('Gift card sent to ' + to);
   },
   pref(el) { S.prefs[el.dataset.k] = !S.prefs[el.dataset.k]; save(); render(); },
@@ -1099,6 +1142,7 @@ const actions = {
     const b = S.bookings.find(x => x.id === el.dataset.id);
     createAccount(b.contact);
     const a = b.address; if (a && !S.saved.some(x => x.line === a.line)) S.saved.push({ label: S.saved.length ? 'Other' : 'Home', line: a.line, unit: a.unit || '' });
+    addLetter('welcome', 'Welcome to Ribbon Circle', 'Your details are kept safe, and next time your appointment takes seconds.', '#/account');
     save(); render(); toast('Account created');
   },
   'dismiss-acct'(el) { const b = S.bookings.find(x => x.id === el.dataset.id); b.noAcct = true; save(); render(); },
@@ -1162,9 +1206,12 @@ const actions = {
     const r = S.referrals.find(x => x.status !== 'completed');
     if (!r) S.referrals.unshift({ id: 'r' + Date.now(), name: 'Sophie L.', status: 'invited', date: iso(new Date()) });
     else if (r.status === 'invited') { r.status = 'booked'; toast(r.name + ' has booked'); }
-    else { r.status = 'completed'; S.credit = Math.round((S.credit + INVITE_CREDIT) * 100) / 100; toast(money(INVITE_CREDIT) + ' credited to your account'); }
+    else { r.status = 'completed'; S.credit = Math.round((S.credit + INVITE_CREDIT) * 100) / 100; toast(money(INVITE_CREDIT) + ' credited to your account'); addLetter('credit', `${money(INVITE_CREDIT)} credited: ${r.name} has booked`, 'Thank you for the introduction. Your Ribbon credit will be applied automatically to your next appointment.', '#/introductions'); }
     save(); render();
   },
+  'letter-open'(el) { const l = S.letters.find(x => x.id === el.dataset.id); l.open = !l.open; l.read = true; save(); render(); },
+  'letters-read'() { S.letters.forEach(l => { l.read = true; }); save(); render(); },
+  'tip-after'(el) { const b = S.bookings.find(x => x.id === el.dataset.id), v = +el.dataset.v; b.tipAfter = v || -1; save(); render(); if (v) toast(`${money(v)} gratuity added. Thank you.`); },
   soon() { toast('Not part of this demo'); },
   reset() {
     openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>
