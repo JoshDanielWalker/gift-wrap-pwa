@@ -91,3 +91,8 @@ A private invitation rather than a referral link: each member has a personal cod
 - **Private consultation**: request a 15-minute concierge call (bespoke themes, large orders, corporate gifting), reachable from Help and each package.
 - **The Ribbon Guarantee**: if anything isn't perfect, Camille returns within 24 hours at no charge.
 - **Finish time** on every appointment card, and a "Your time with Camille" summary (appointments, gifts wrapped, hours returned).
+
+## Reliability & accessibility
+- **Always current**: the service worker is network-first for the app (HTML, JS, CSS), so an online visitor never runs a stale or mixed version; fonts and icons are cache-first, and everything falls back to the cache offline. When a new version is activated while the app is open, a quiet "A new version is available · Refresh" banner appears. The version is shown at the foot of the Account tab.
+- **Screen readers & keyboard**: each page sets its title, announces itself and moves focus to the top; the tab bar is a labelled `nav` with `aria-current`; selection state (chips, themes, days, slots, packages, options) is exposed with `aria-pressed`; toggles are `role="switch"`; dialogs are labelled by their heading and close with Esc; calendar days and theme swatches have spoken labels; invalid contact fields set `aria-invalid`.
+- **Large text & small screens**: layouts are audited at 280px wide and at 150% text zoom as well as the usual phone, tablet and desktop sizes.
