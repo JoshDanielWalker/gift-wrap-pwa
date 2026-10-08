@@ -17,12 +17,21 @@ const PACKAGES = [
     feats: ['A dedicated master wrapper for the afternoon', 'Custom monogram & themed styling', 'Fabric furoshiki wraps', 'Gift-table styling & photo set'] },
 ];
 const PALETTES = [
-  { id: 'noir', name: 'Noir', paper: '#17171a', rib: '#c9a45c' },
-  { id: 'ivory', name: 'Ivory', paper: '#ece4d2', rib: '#b8975a' },
-  { id: 'blush', name: 'Blush', paper: '#e8c5c0', rib: '#b9786b' },
-  { id: 'emerald', name: 'Emerald', paper: '#14463a', rib: '#d9bd7c' },
-  { id: 'midnight', name: 'Midnight', paper: '#1b2a4a', rib: '#c0c8d8' },
+  { id: 'noir', short: 'Noir', name: 'Noir Gala', paper: '#17171a', rib: '#c9a45c', story: 'Midnight paper with an antique-gold ribbon. Evening, decisive, unmistakable.', stock: '140 gsm cotton-rag, matte ink black', ribbon: '25 mm double-faced silk satin, antique gold', finish: 'Hand-tied bow, black tissue' },
+  { id: 'ivory', short: 'Ivory', name: 'Ivory Heirloom', paper: '#ece4d2', rib: '#b8975a', story: 'Soft ivory and champagne, in the manner of a family jeweller’s box.', stock: 'Textured laid paper, warm ivory', ribbon: '25 mm silk satin, champagne', finish: 'Hand-tied bow, scented tissue' },
+  { id: 'blush', short: 'Blush', name: 'Blush Atelier', paper: '#e8c5c0', rib: '#b9786b', story: 'A quiet rose with a copper-rose ribbon. Tender, modern, a little unexpected.', stock: '120 gsm cotton paper, dusty rose', ribbon: '20 mm velvet-backed satin, rose copper', finish: 'Hand-tied bow, dried botanical' },
+  { id: 'emerald', short: 'Emerald', name: 'Emerald Reserve', paper: '#14463a', rib: '#d9bd7c', story: 'Deep forest green gilded with pale gold. Considered, enduring, a little grand.', stock: '140 gsm cotton-rag, forest green', ribbon: '25 mm silk satin, pale gold', finish: 'Hand-tied bow, gilt-edged tag' },
+  { id: 'midnight', short: 'Midnight', name: 'Midnight Celebration', paper: '#1b2a4a', rib: '#c0c8d8', story: 'Deep navy with a silver-grey ribbon. Cool, precise, and made for a milestone.', stock: '140 gsm cotton-rag, midnight navy', ribbon: '25 mm silk satin, silver grey', finish: 'Hand-tied bow, pressed-foil tag' },
+  { id: 'bordeaux', short: 'Bordeaux', name: 'Bordeaux Edition', paper: '#4a1823', rib: '#d9bf84', limited: { total: 60, taken: 41, label: 'Winter Edition' }, story: 'Our winter edition: claret paper, antique gold, a numbered tag. Made in a single run.', stock: '160 gsm cotton-rag, claret, hand-deckled edge', ribbon: '30 mm double-faced silk, antique gold', finish: 'Numbered tag, wax-sealed, gilt tissue' },
 ];
+/** Camille's suggested theme for each occasion. */
+const RECO = { Birthday: 'noir', Holiday: 'bordeaux', Wedding: 'ivory', Anniversary: 'emerald', Baby: 'blush', Corporate: 'midnight', 'Just because': 'blush' };
+const editionLeft = p => { let n = 0; try { n = +localStorage.getItem('ribbon-edition') || 0; } catch { /* ignore */ } return Math.max(0, p.limited.total - p.limited.taken - n); };
+const editionTake = () => { try { localStorage.setItem('ribbon-edition', String((+localStorage.getItem('ribbon-edition') || 0) + 1)); } catch { /* ignore */ } };
+const GUARANTEE = 'If any bow, corner or fold isn’t perfect, Camille returns within 24 hours to make it right, at no charge.';
+/** Time returned to the client: shopping for materials, wrapping to a premium finish and tidying, less the minutes to hand over. */
+const DIY = { classic: [30, 18], signature: [45, 26], atelier: [75, 38], maison: [90, 50] }, HANDOVER = 10;
+const timeSaved = (pkgId, gifts, addons = []) => Math.max(15, Math.round((DIY[pkgId][0] + DIY[pkgId][1] * gifts + 10 + addons.length * 12 - HANDOVER) / 5) * 5);
 const ADDONS = [
   { id: 'calli', name: 'Hand-lettered tags', desc: 'Calligraphy for every gift', price: 18 },
   { id: 'seal', name: 'Monogram wax seal', desc: 'Your initials in sealing wax', price: 22 },
@@ -62,6 +71,7 @@ const RITUAL = [
   ['Final inspection & tidy', 'A last check of each bow and corner. All offcuts leave with us.'],
 ];
 const FAQ = [
+  ['What is the Ribbon Guarantee?', GUARANTEE],
   ['What do you bring with you?', 'Everything: paper, ribbon, boxes, tags, tools and a protective work mat. You only need a clear table.'],
   ['What if I have more gifts than my package includes?', 'Add extra gifts on the next step for a small per-gift charge. Your wrapper can also adapt on the day.'],
   ['Can I change or cancel my appointment?', 'Yes. Rescheduling and cancellation are free up to 24 hours before your appointment.'],
@@ -151,11 +161,12 @@ function demoOccasions() {
 function returningClient() {
   const d = new Date(); d.setDate(d.getDate() - 21);
   const d2 = new Date(); d2.setDate(d2.getDate() - 70);
+  const d3 = new Date(); d3.setDate(d3.getDate() - 150);
   const mk = (id, pkg, gifts, pal, date, time, addr, total) => ({
     id, pkg, gifts, palette: pal, occasion: 'Birthday', addons: [], note: '', cardmsg: '', date: iso(date), time, address: addr, total, status: 'done', rating: 5,
     createdAt: date.getTime() - 86400000 * 3, pay: 'visa', contact: { name: 'Josh Walker', email: DEMO_EMAIL, phone: '(212) 555-0142' },
   });
-  return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8)],
+  return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8), mk('GW-27744', 'atelier', 6, 'emerald', d3, '10', { ...SAVED[0] }, 238.6)],
     saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), occasions: demoOccasions(), credit: 30,
     letters: [{ id: 'l1', ts: Date.now() - 86400000 * 2, kind: 'season', title: 'The December diary is open to you', body: 'As one of Camille’s returning clients, you may reserve the holiday diary before it opens to everyone on 1 November. Peak dates fill first.', link: '#/season', read: false },
       { id: 'l2', ts: Date.now() - 86400000 * 12, kind: 'welcome', title: 'Welcome to Ribbon Circle', body: 'Thank you for joining us. Your addresses, payment cards and remembered occasions are kept safe, and your invitation to share with friends is ready.', link: '#/introductions', read: true }],
@@ -224,7 +235,7 @@ function syncEarly(d) {
 }
 function newDraft(pkgId) {
   const p = pkgOf(pkgId || 'signature');
-  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], remember: false, remWho: '', remDate: '', occId: null, perk: false, earlyAdded: false, date: firstOpenDate(p.mins), time: null,
+  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], remember: false, remWho: '', remDate: '', monogram: '', occId: null, perk: false, earlyAdded: false, date: firstOpenDate(p.mins), time: null,
     address: null, promo: '', tip: 0.1, pay: S.cards[0]?.id || WALLET.id };
 }
 const draft = () => S.draft || (S.draft = newDraft());
@@ -234,7 +245,7 @@ function quote(d) {
   const p = pkgOf(d.pkg);
   const extra = Math.max(0, d.gifts - p.incl) * p.extra;
   const addons = d.addons.reduce((a, id) => a + ADDONS.find(x => x.id === id).price, 0);
-  const asap = d.date === iso(new Date()) ? ASAP_FEE : 0;
+  const ti = tier().i, feeWaived = ti >= 1, asap = d.date === iso(new Date()) && ti < 3 ? ASAP_FEE : 0;
   const peak = isPeak(d.date) ? PEAK_FEE : 0;
   const base = p.price + extra + addons;
   const rate = PROMOS[(d.promo || '').toUpperCase()] || 0;
@@ -244,10 +255,10 @@ function quote(d) {
   const room = Math.max(0, base - discount - perk - early);
   const invite = S.invite && !S.invite.used && S.bookings.length === 0 ? Math.min(INVITE_CREDIT, room) : 0;
   const credit = Math.min(S.credit || 0, room - invite);
-  const taxable = base - discount - perk - early - invite - credit + peak + asap + SERVICE_FEE;
+  const taxable = base - discount - perk - early - invite - credit + peak + asap + (feeWaived ? 0 : SERVICE_FEE);
   const tax = taxable * TAX;
   const tip = (p.price + extra) * (d.tip || 0);
-  return { p, extra, addons, asap, peak, base, discount, perk, early, invite, inviteFrom: S.invite?.from, credit, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
+  return { p, extra, addons, asap, peak, base, discount, perk, early, invite, inviteFrom: S.invite?.from, credit, fee: feeWaived ? 0 : SERVICE_FEE, feeWaived, tax, tip, total: taxable + tax + tip };
 }
 const OPEN_H = 9, CLOSE_H = 20, BUFFER = 30, LEAD_MIN = 90;
 /** Appointment length: package time plus 8 min for each gift beyond those included. */
@@ -413,13 +424,16 @@ route(/^customize$/, () => {
   return { html: flow(1, 'Make it yours', `${p.name} · ${p.incl} gifts included, extra gifts ${money(p.extra)} each.`,
     `<div class="pad"><div class="card row between"><div><b>Number of gifts</b><div class="muted small">${d.gifts > p.incl ? `+${money((d.gifts - p.incl) * p.extra)} for ${d.gifts - p.incl} extra` : 'Included in package'}</div></div>
       <div class="stepper"><button data-act="gifts" data-d="-1" ${d.gifts <= 1 ? 'disabled' : ''} aria-label="Fewer">${ic('minus')}</button><b>${d.gifts}</b>
-      <button data-act="gifts" data-d="1" ${d.gifts >= 30 ? 'disabled' : ''} aria-label="More">${ic('plus')}</button></div></div></div>
+      <button data-act="gifts" data-d="1" ${d.gifts >= 30 ? 'disabled' : ''} aria-label="More">${ic('plus')}</button></div></div>
+      ${timeRow(timeSaved(d.pkg, d.gifts, d.addons))}</div>
     <div class="sec"><h3>Occasion</h3></div><div class="chips">${OCCASIONS.map(o => `<button class="chip ${d.occasion === o ? 'on' : ''}" data-act="occasion" data-v="${o}">${o}</button>`).join('')}</div>
     ${traditionBlock(d)}
-    <div class="sec"><h3>Palette</h3></div><div class="swatches">${PALETTES.map(p => `<button class="sw ${d.palette === p.id ? 'on' : ''}" data-act="palette" data-id="${p.id}">
-      <i style="background:${p.paper};--rib:${p.rib}"></i>${p.name}</button>`).join('')}</div>
+    <div class="sec"><h3>Theme</h3><span class="muted small">Six collections</span></div><div class="swatches">${PALETTES.map(p => { const out = p.limited && editionLeft(p) <= 0; return `<button class="sw ${d.palette === p.id ? 'on' : ''}" ${out ? 'disabled' : ''} data-act="palette" data-id="${p.id}">
+      <i style="background:${p.paper};--rib:${p.rib}"></i>${p.short}${RECO[d.occasion] === p.id ? '<em class="recdot" title="Recommended"></em>' : p.limited ? '<em class="swtag">' + (out ? 'Sold out' : 'Limited') + '</em>' : ''}</button>`; }).join('')}</div>
+    ${themePanel(d)}
     <div class="sec"><h3>Enhancements</h3></div><div class="stack">${ADDONS.map(a => `<button class="opt ${d.addons.includes(a.id) ? 'on' : ''}" data-act="addon" data-id="${a.id}">
       <span class="check">${ic('check')}</span><span class="grow"><b>${a.name}</b><span class="muted small" style="display:block">${a.desc}</span></span><span class="gold">+${money(a.price)}</span></button>`).join('')}</div>
+    ${d.addons.includes('seal') ? `<div class="sec"><h3>Your monogram</h3></div><div class="pad"><label class="field"><span>Up to three initials</span><input data-bind="monogram" maxlength="3" value="${esc(d.monogram)}" placeholder="JDW" style="text-transform:uppercase;letter-spacing:.2em" autocapitalize="characters"></label></div>` : ''}
     ${d.addons.includes('card') ? `<div class="sec"><h3>Your card message</h3></div><div class="pad"><label class="field"><span>Written by hand</span>
       <textarea rows="3" maxlength="160" data-bind="cardmsg" placeholder="Happy birthday, Mum. With all my love, J x">${esc(d.cardmsg)}</textarea></label></div>` : ''}
     <div class="sec"><h3>Your gifts</h3><span class="muted small">Optional</span></div>
@@ -544,7 +558,8 @@ route(/^review$/, () => {
       <div class="muted small">${d.gifts} gifts · ${d.occasion} · ${pal.name}</div></div><a class="link" href="#/customize">Edit</a></div>
       <div class="hline"></div>
       <div class="kv">${ic('cal')}<div class="grow"><b>${dayLong(d.date)}</b><div class="muted small">${'Arrives ' + hourLabel(+d.time)}</div></div><a class="link" href="#/schedule">Edit</a></div>
-      <div class="kv">${ic('pin')}<div class="grow"><b>${esc(d.address.line)}</b><div class="muted small">${esc([d.address.unit, d.address.notes].filter(Boolean).join(' · ') || 'No extra details')}</div></div><a class="link" href="#/address">Edit</a></div></div></div>
+      <div class="kv">${ic('pin')}<div class="grow"><b>${esc(d.address.line)}</b><div class="muted small">${esc([d.address.unit, d.address.notes].filter(Boolean).join(' · ') || 'No extra details')}</div></div><a class="link" href="#/address">Edit</a></div>
+      <div class="kv">${ic('clock')}<div class="grow"><b>Time returned to you</b><div class="muted small">About ${durLabel(timeSaved(d.pkg, d.gifts, d.addons))}, less around ${HANDOVER} minutes to hand over your gifts</div></div></div></div></div>
     <div class="sec"><h3>Your details</h3>${S.user ? '' : `<a class="link" data-act="signin">Already a client? Sign in</a>`}</div>
     <div class="pad">${S.user ? `<div class="card row"><div class="avatar">${initials(S.user.name)}</div><div class="grow"><b>${esc(S.user.name)}</b><div class="muted small">${esc(S.user.email)}</div><div class="muted small">${esc(S.user.phone || S.contact.phone)}</div></div>${ic('check')}</div>` : `
       <div class="actions"><button class="btn ghost sm" data-act="social" data-v="Apple">Continue with Apple</button><button class="btn ghost sm" data-act="social" data-v="Google">Continue with Google</button></div>
@@ -571,11 +586,12 @@ route(/^review$/, () => {
       ${q.credit ? `<div class="line disc"><span>Ribbon credit</span><span>−${money(q.credit)}</span></div>` : ''}
       ${q.peak ? `<div class="line"><span>Peak date</span><span>${money(q.peak)}</span></div>` : ''}
       ${q.discount ? `<div class="line disc"><span>Promo ${esc(d.promo.toUpperCase())}</span><span>−${money(q.discount)}</span></div>` : ''}
-      <div class="line"><span>Service fee</span><span>${money(q.fee)}</span></div>
+      <div class="line"><span>Service fee${q.feeWaived ? ' <em class="gold" style="font-style:normal;font-size:12px">· complimentary for members</em>' : ''}</span><span>${money(q.fee)}</span></div>
       <div class="line"><span>Tax</span><span>${money(q.tax)}</span></div>
       ${q.tip ? `<div class="line"><span>Tip</span><span>${money(q.tip)}</span></div>` : ''}
       <div class="line tot"><span>Total</span><span>${money(q.total)}</span></div>
       ${depositOf(d, q) ? `<div class="line small"><span class="muted">Deposit due today (${DEPOSIT_RATE * 100}%)</span><b>${money(depositOf(d, q))}</b></div><div class="line small"><span class="muted">Balance after your appointment</span><span>${money(q.total - depositOf(d, q))}</span></div>` : ''}</div></div>
+    <div class="pad mt16"><div class="row" style="align-items:flex-start">${ic('shield')}<p class="small muted"><b style="color:var(--ink)">The Ribbon Guarantee.</b> ${GUARANTEE}</p></div></div>
     <p class="muted small pad mt16">${isSeason(d.date) ? `Holiday reservation: free changes until ${dayLong(season().changesUntil)}. After that, your deposit is retained.` : 'Free cancellation up to 24 hours before your appointment.'}</p>`,
     `<button class="btn" id="bookbtn" ${contactOk() ? '' : 'disabled'} data-act="book">${contactOk() ? bookLabel(d) : 'Add your details to book'}</button>`) };
 });
@@ -621,10 +637,11 @@ route(/^confirmed\/([\w-]+)$/, id => {
     <h1 class="title center">Your appointment<br>is reserved.</h1><p class="sub center">A confirmation is on its way to ${esc(b.contact?.email || '')}</p>
     <div class="pad"><div class="appt"><span class="tiny gold">${b.id}</span>
       <div class="when">${dayLong(b.date)}</div>
-      <div class="muted">${'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="muted">${'Arrival at ' + hourLabel(+b.time)} · finished by about ${endLabel(b)}</div>
       <div class="hline"></div><b class="ct">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div>
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
+      <div class="mt16 center">${timeRow(timeSaved(b.pkg, b.gifts, b.addons || []))}</div>
       <p class="muted small mt16 center">Camille will message you the day before. Free changes up to 24 hours ahead.</p>${occConfirm(b)}${acctPrompt(b)}</div>
     <div class="cta"><a class="btn" href="#/track/${b.id}">View booking</a><div class="actions mt8"><button class="btn ghost" data-act="ics" data-id="${b.id}">Add to calendar</button><a class="btn ghost" href="#/">Done</a></div></div></div>` };
 });
@@ -656,8 +673,7 @@ route(/^account$/, () => {
   const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
   return { tab: 'account', html: `<div class="screen"><div class="pad ptop">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
     <div><h2 class="h2">${esc(u.name)}</h2><div class="muted small">${esc(u.email)}</div></div></div>
-    <div class="card mt24 row between"><div><div class="tiny gold">Ribbon Circle</div><b>Member since ${new Date(u.since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
-      <div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed${S.credit > 0 ? ' · Ribbon credit ' + money(S.credit) : ''}</div></div>${ic('sparkle')}</div>` :
+    ${tierCard(u)}${yearCard()}` :
     `<span class="tiny gold">Ribbon Circle</span><h1 class="title" style="padding:6px 0 10px">Your details,<br>remembered.</h1>
     <p class="muted">You’re browsing as a guest. You never need an account to book, but one makes every visit faster.</p>
     <ul class="checklist mt16"><li>${ic('check')}Rebook a favourite wrap in one tap</li><li>${ic('check')}Saved addresses and payment cards</li><li>${ic('check')}First access to holiday appointments</li></ul>
@@ -691,6 +707,18 @@ function reviewBlock(b) {
     : `<div class="pad mt16"><label class="field"><span>Tell us more (optional)</span><textarea id="rv" rows="3" placeholder="What did you love?"></textarea></label>
       <button class="btn ghost sm mt8" style="width:100%" data-act="review-save" data-id="${b.id}">Send review</button></div>`;
 }
+function tierCard(u) {
+  const t = tier();
+  return `<button class="card mt24" style="text-align:left;width:100%" data-act="tier-info"><div class="row between"><div><div class="tiny gold">Ribbon Circle · ${t.t.name}</div>
+    <div class="ct" style="margin-top:2px">Member since ${new Date(u.since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</div></div>${ic('sparkle')}</div>
+    <div class="bar"><i style="width:${t.pct}%"></i></div>
+    <div class="muted small">${t.next ? `${t.toNext} more appointment${t.toNext > 1 ? 's' : ''} to reach ${t.next.name}` : 'Our highest tier. Thank you.'}${S.credit > 0 ? ' · Ribbon credit ' + money(S.credit) : ''}</div></button>`;
+}
+function yearCard() {
+  const done = S.bookings.filter(b => b.status === 'done'); if (!done.length) return '';
+  const gifts = done.reduce((a, b) => a + b.gifts, 0), mins = done.reduce((a, b) => a + timeSaved(b.pkg, b.gifts, b.addons || []), 0);
+  return `<div class="card mt16"><span class="tiny gold">Your time with Camille</span><div class="stats mt8"><div><b class="stat">${done.length}</b><small>appointments</small></div><div><b class="stat">${gifts}</b><small>gifts wrapped</small></div><div><b class="stat">${Math.round(mins / 60)}</b><small>hours returned</small></div></div></div>`;
+}
 function bookingView(b) {
   const p = pkgOf(b.pkg), idx = STAGES.findIndex(s => s.id === b.status), cancelled = b.status === 'cancelled';
   const first = WRAPPER.name.split(' ')[0];
@@ -706,9 +734,10 @@ function bookingView(b) {
     <div class="topbar"><a class="iconbtn" href="#/bookings" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Booking ${b.id}</div></div>
     <div class="pad"><div class="appt"><span class="status ${b.status === 'done' ? 'done' : cancelled ? 'cancelled' : ''}">${cancelled ? 'Cancelled' : STAGES[idx].long}</span>
       <div class="when">${dayLong(b.date)}</div>
-      <div class="muted">${'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="muted">${'Arrival at ' + hourLabel(+b.time)} · finished by about ${endLabel(b)}</div>
       ${!cancelled && b.status !== 'done' ? `<div class="tiny gold mt8">${countdown(b)}</div>` : ''}
-      <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div></div>
+      <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
+      ${cancelled ? '' : `<div class="center mt16">${timeRow(timeSaved(b.pkg, b.gifts, b.addons || []))}</div>`}</div>
     ${cancelled ? '' : `<div class="pad mt24"><div class="timeline">${STAGES.map((s, i) => `<div class="tl ${i < idx || b.status === 'done' ? 'done' : i === idx ? 'now' : ''}"><i></i>${s.label}</div>`).join('')}</div></div>`}
     <div class="sec"><h3>${cancelled ? 'Booking cancelled' : 'Your wrapper'}</h3></div>
     <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b class="ct">${WRAPPER.name}</b>
@@ -716,12 +745,14 @@ function bookingView(b) {
         <p class="small mt16">${intro[b.status][1]}</p>
         <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`}</div>
     ${b.status === 'done' ? `<div class="sec"><h3>Rate your experience</h3></div><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div>` : ''}
+    ${b.status === 'done' ? `<div class="pad mt16"><a class="card row" href="#/certificate/${b.id}">${ic('shield')}<div class="grow small"><b>Certificate of Wrapping</b><div class="muted">No. RC-${b.id.replace(/\D/g, '')} · keep it with the gift</div></div>${ic('chev')}</a></div>` : ''}
     ${b.status === 'done' ? gratuityBlock(b) : ''}
     ${b.status === 'done' && b.rating ? reviewBlock(b) + introCard() : ''}
     <div class="sec"><h3>Your order</h3></div>
     <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b class="ct">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div></div></div>
       ${addons.length ? `<div class="hline"></div><div class="small">${addons.map(a => `<div class="row between"><span>${a.name}</span><span class="muted">${money(a.price)}</span></div>`).join('')}</div>` : ''}
+      ${b.monogram ? `<div class="hline"></div><div class="row between small"><span class="muted">Monogram</span><b style="letter-spacing:.2em">${esc(b.monogram)}</b></div>` : ''}
       ${(b.items || []).length ? `<div class="hline"></div><div class="tiny muted">Your gifts</div><div class="small mt8">${b.items.map(i => `<div class="row between"><span>${esc(i.what || 'Gift')}</span><span class="muted">${i.who ? 'for ' + esc(i.who) : ''}</span></div>`).join('')}</div>` : ''}
       ${(b.photos || []).length ? `<div class="photos mt8">${b.photos.map((p, i) => `<div class="ph"><img src="${p}" alt="Gift photo ${i + 1}"></div>`).join('')}</div>` : ''}
       ${b.cardmsg ? `<div class="hline"></div><div class="tiny muted">Card message</div><p class="small mt8" class="lead" style="font-style:italic">“${esc(b.cardmsg)}”</p>` : ''}
@@ -745,7 +776,7 @@ route(/^receipt\/([\w-]+)$/, id => {
   if (!b) return { redirect: '#/bookings' };
   const p = pkgOf(b.pkg), q = b.q, c = b.contact || {};
   const lines = q ? [[p.name, p.price], q.extra && [`${b.gifts - p.incl} extra gifts`, q.extra], ...(b.addons || []).map(id => { const a = ADDONS.find(x => x.id === id); return [a.name, a.price]; }),
-      q.asap && ['Same-day priority', q.asap], q.perk && ['Complimentary wax seal', -q.perk], q.early && ['Early reservation: hand-lettered tags', -q.early], q.invite && [`Invitation from ${q.inviteFrom || 'a friend'}`, -q.invite], q.credit && ['Ribbon credit', -q.credit], q.peak && ['Peak date', q.peak], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], ['Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
+      q.asap && ['Same-day priority', q.asap], q.perk && ['Complimentary wax seal', -q.perk], q.early && ['Early reservation: hand-lettered tags', -q.early], q.invite && [`Invitation from ${q.inviteFrom || 'a friend'}`, -q.invite], q.credit && ['Ribbon credit', -q.credit], q.peak && ['Peak date', q.peak], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], [q.feeWaived ? 'Service fee (complimentary)' : 'Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
     : [[p.name, p.price], ['Service, tax & gratuity', b.total - p.price]];
   return { html: `<div class="screen" style="padding-bottom:40px"><div class="topbar noprint"><a class="iconbtn" href="#/track/${b.id}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Receipt</div></div>
     <div class="pad"><div class="receipt"><div class="center"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div></div><div class="hline"></div>
@@ -768,6 +799,41 @@ route(/^track\/([\w-]+)$/, id => {
   return { html: bookingView(b) };
 });
 
+
+/* ---------- Time, themes, tiers, certificates ---------- */
+const timeRow = m => `<button class="timesave" data-act="timesave-info">${ic('clock')}<span>Returns about <b>${durLabel(m)}</b> to your day</span></button>`;
+const endLabel = b => { const t = +b.time * 60 + (b.mins || pkgOf(b.pkg).mins), h = Math.floor(t / 60), m = t % 60; return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const TIERS = [
+  { name: 'Member', at: 0, perks: ['A personal note from Camille before every remembered date', 'Priority holiday diary after your first booking'] },
+  { name: 'Silver', at: 3, perks: ['Service fee complimentary on every booking', 'A birthday card, hand-lettered by Camille'] },
+  { name: 'Gold', at: 6, perks: ['Everything in Silver', 'Early access to limited editions'] },
+  { name: 'Noir', at: 12, perks: ['Everything in Gold', 'Same-day priority fee waived', 'An annual private consultation with Camille'] },
+];
+const doneCount = () => S.bookings.filter(b => b.status === 'done').length;
+function tier() {
+  const n = doneCount(); let i = 0; TIERS.forEach((t, k) => { if (n >= t.at) i = k; });
+  const next = TIERS[i + 1]; return { i, t: TIERS[i], next, toNext: next ? next.at - n : 0, n, pct: next ? Math.round((n - TIERS[i].at) / (next.at - TIERS[i].at) * 100) : 100 };
+}
+function themePanel(d) {
+  const p = palOf(d.palette), rec = RECO[d.occasion] === p.id, left = p.limited ? editionLeft(p) : 0;
+  return `<div class="pad mt16"><div class="card theme"><div class="row between"><div class="grow"><span class="tiny gold">${rec ? 'Camille recommends for ' + esc(d.occasion.toLowerCase()) : 'Your theme'}${p.limited ? ' · Limited edition' : ''}</span><div class="ct" style="margin-top:4px">${p.name}</div></div>${gift(p.id, 60)}</div>
+    <p class="small muted mt8">${p.story}</p>
+    ${RECO[d.occasion] && RECO[d.occasion] !== p.id && !(palOf(RECO[d.occasion]).limited && editionLeft(palOf(RECO[d.occasion])) <= 0) ? `<p class="small mt8">For ${esc(d.occasion.toLowerCase())}, Camille recommends <a class="link" data-act="palette" data-id="${RECO[d.occasion]}">${palOf(RECO[d.occasion]).name}</a>.</p>` : ''}
+    <div class="spec"><div><span>Paper</span>${p.stock}</div><div><span>Ribbon</span>${p.ribbon}</div><div><span>Finish</span>${p.finish}</div></div>
+    ${p.limited ? `<div class="bar"><i style="width:${(p.limited.total - left) / p.limited.total * 100}%"></i></div><div class="small muted">${p.limited.label}: <b>${left} of ${p.limited.total}</b> remaining this season</div>` : ''}
+    <button class="link mt16" data-act="craft">The craft behind every wrap</button></div></div>`;
+}
+route(/^certificate\/([\w-]+)$/, id => {
+  const b = S.bookings.find(x => x.id === id);
+  if (!b || b.status !== 'done') return { redirect: '#/bookings' };
+  const p = palOf(b.palette), num = 'RC-' + b.id.replace(/\D/g, '');
+  return { html: `<div class="screen" style="padding-bottom:40px"><div class="topbar noprint"><a class="iconbtn" href="#/track/${b.id}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Certificate</div></div>
+    <div class="pad"><div class="cert">${monogram()}<span class="tiny gold">Certificate of Wrapping</span><div class="cert-no">No. ${num}</div>
+      <p class="lead mt16">This certifies that ${b.gifts} gift${b.gifts > 1 ? 's were' : ' was'} wrapped entirely by hand, in the <em>${p.name}</em> theme, on ${dayLong(b.date)}.</p>
+      <div class="spec mt16" style="text-align:left"><div><span>Paper</span>${p.stock}</div><div><span>Ribbon</span>${p.ribbon}</div><div><span>Finish</span>${p.finish}</div></div>
+      <div class="sig">Camille Laurent</div><div class="tiny muted">Master Wrapper · Ribbon &amp; Co.</div></div>
+      <button class="btn mt24 noprint" data-act="print">Print or save as PDF</button></div></div>` };
+});
 
 /* ---------- Occasions: remembered annual dates ---------- */
 const ANNUAL = ['Birthday', 'Anniversary', 'Wedding'];
@@ -928,7 +994,8 @@ route(/^gifting$/, () => sub('Gift cards &amp; offers', 'Give the gift of beauti
   ${S.giftcards.length ? `<div class="sec"><h3>Sent</h3></div><div class="stack">${S.giftcards.map(g => `<div class="card row between"><div><b>${money(g.amount)} · ${esc(g.to)}</b><div class="muted small">${g.code}</div></div><span class="status done">Delivered</span></div>`).join('')}</div>` : ''}`));
 
 route(/^help$/, () => sub('Concierge &amp; help', 'Our team is available daily from 8am to 8pm.',
-  `<div class="pad"><div class="actions"><button class="btn ghost" data-act="chat-support">Message us</button><button class="btn ghost" data-act="call-support">Call us</button></div></div>
+  `<div class="pad"><div class="actions"><button class="btn ghost" data-act="chat-support">Message us</button><button class="btn ghost" data-act="call-support">Call us</button></div>
+    <button class="btn mt8" data-act="consult">Request a private consultation</button></div>
   <div class="sec"><h3>Common questions</h3></div><div class="pad faq">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div>
   <div class="sec"><h3>Our policy</h3></div><div class="pad"><p class="muted small">Cancel or reschedule free of charge up to 24 hours before your appointment. Within 24 hours a 50% fee applies. If we’re unable to deliver the service, you are never charged.</p></div>`));
 
@@ -972,7 +1039,7 @@ const bind = (path, v) => { const parts = path.split('.'); let o = parts[0] === 
 function finishBooking() {
     const d = draft(), q = quote(d);
     const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
-      contact: { ...S.contact }, q: (({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total }) => ({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total, promo: d.promo }))(q), deposit: depositOf(d, q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+      monogram: (d.addons.includes('seal') ? (d.monogram || '').toUpperCase().slice(0, 3) : ''), contact: { ...S.contact }, q: (({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, feeWaived, tax, tip, total }) => ({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, feeWaived, tax, tip, total, promo: d.promo }))(q), deposit: depositOf(d, q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
     const snap = { date: b.date, pkg: b.pkg, gifts: b.gifts, palette: b.palette, addons: b.addons, items: b.items, address: b.address, total: b.total };
     let o = d.occId && S.occasions.find(x => x.id === d.occId);
     if (o) (o.history ||= []).push(snap);
@@ -981,6 +1048,7 @@ function finishBooking() {
     if (q.invite) S.invite.used = true;
     if (q.credit) S.credit = Math.round((S.credit - q.credit) * 100) / 100;
     addLetter('booking', 'Your appointment is reserved', `${pkgOf(b.pkg).name} on ${dayLong(b.date)} at ${hourLabel(+b.time)}. Camille will write to you the day before.`, '#/track/' + b.id);
+    if (d.palette === 'bordeaux') editionTake();
     S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
     location.hash = '#/confirmed/' + b.id;
 }
@@ -1054,7 +1122,7 @@ const actions = {
   close() { closeSheet(); },
   rebook(el) {
     const b = S.bookings.find(x => x.id === el.dataset.id), d = newDraft(b.pkg);
-    Object.assign(d, { gifts: b.gifts, palette: b.palette, occasion: b.occasion, addons: (b.addons || []).slice(), cardmsg: b.cardmsg || '', items: (b.items || []).map(i => ({ ...i })), address: { ...b.address } });
+    Object.assign(d, { gifts: b.gifts, palette: b.palette, occasion: b.occasion, addons: (b.addons || []).slice(), cardmsg: b.cardmsg || '', monogram: b.monogram || '', items: (b.items || []).map(i => ({ ...i })), address: { ...b.address } });
     S.draft = d; save(); location.hash = '#/schedule';
   },
   ics(el) {
@@ -1077,7 +1145,9 @@ const actions = {
       <div class="hline"></div><ul class="feat" style="border:0;margin:0;padding:0">${p.feats.map(f => `<li>${ic('check')}${f}</li>`).join('')}</ul>
       <div class="sec" style="padding:22px 0 6px"><h3 class="ct">The ritual</h3></div>
       <div class="how" style="padding:0">${RITUAL.map(([t, d], n) => `<div style="padding:12px 0"><i style="font-size:22px">${n + 1}</i><span><b style="font-size:17px">${t}</b><span class="muted small">${d}</span></span></div>`).join('')}</div>
-      <button class="btn mt16" data-act="pick-close" data-id="${p.id}">Select ${p.name}</button>`);
+      <div class="row mt16" style="align-items:flex-start">${ic('shield')}<p class="small muted"><b style="color:var(--ink)">The Ribbon Guarantee.</b> ${GUARANTEE}</p></div>
+      <button class="btn mt16" data-act="pick-close" data-id="${p.id}">Select ${p.name}</button>
+      <p class="center mt16"><a class="link" data-act="consult">Speak with the concierge first</a></p>`);
   },
   'pick-close'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; if (!timeStillFree(d)) d.time = null; save(); closeSheet(); render(); },
   resched(el) {
@@ -1235,6 +1305,45 @@ const actions = {
   'letter-open'(el) { const l = S.letters.find(x => x.id === el.dataset.id); l.open = !l.open; l.read = true; save(); render(); },
   'letters-read'() { S.letters.forEach(l => { l.read = true; }); save(); render(); },
   'tip-after'(el) { const b = S.bookings.find(x => x.id === el.dataset.id), v = +el.dataset.v; b.tipAfter = v || -1; save(); render(); if (v) toast(`${money(v)} gratuity added. Thank you.`); },
+  'timesave-info'() {
+    openSheet(`<span class="tiny gold">Your time</span><h3>How we estimate it</h3>
+      <p class="muted small">We compare your appointment with wrapping the same gifts yourself: sourcing quality paper, ribbon and tags, wrapping each gift to a premium finish, and tidying afterwards.</p>
+      <p class="muted small mt8">With Camille, your part is about ${HANDOVER} minutes to hand over your gifts. The rest of the time is yours.</p>
+      <button class="btn ghost mt16" data-act="close">Close</button>`);
+  },
+  craft() {
+    openSheet(`<span class="tiny gold">Ribbon &amp; Co.</span><h3>The craft behind every wrap</h3>
+      <ul class="checklist mt16"><li>${ic('check')}<span><b>Paper.</b> Cotton-rag stock from small family mills, chosen for how it folds and holds an edge.</span></li>
+        <li>${ic('check')}<span><b>Folds.</b> Every corner is hand-creased with a bone folder, with a clean, concealed seam.</span></li>
+        <li>${ic('check')}<span><b>Ribbon.</b> Double-faced silk satin, cut to length for each gift and heat-sealed so it never frays.</span></li>
+        <li>${ic('check')}<span><b>The bow.</b> Tied by hand, never pre-made, and adjusted until both loops sit exactly level.</span></li>
+        <li>${ic('check')}<span><b>Tissue.</b> Acid-free and lightly scented, so your gift arrives as it should.</span></li></ul>
+      <div class="row mt16" style="align-items:flex-start">${ic('shield')}<p class="small muted"><b style="color:var(--ink)">The Ribbon Guarantee.</b> ${GUARANTEE}</p></div>
+      <button class="btn ghost mt16" data-act="close">Close</button>`);
+  },
+  'tier-info'() {
+    const cur = tier();
+    openSheet(`<span class="tiny gold">Ribbon Circle</span><h3>${cur.t.name} member</h3>
+      <p class="muted small mb8">${cur.n} completed appointment${cur.n === 1 ? '' : 's'}.${cur.next ? ` ${cur.toNext} more to reach ${cur.next.name}.` : ''}</p>
+      ${TIERS.map((t, i) => `<div class="kv">${ic(i <= cur.i ? 'check' : 'gem')}<div class="grow"><b>${t.name}</b> <span class="muted small">· from ${t.at ? t.at + ' appointments' : 'your first booking'}</span>
+        <div class="muted small">${t.perks.join(' · ')}</div></div></div>`).join('')}
+      <button class="btn ghost mt16" data-act="close">Close</button>`);
+  },
+  consult() {
+    openSheet(`<span class="tiny gold">Concierge</span><h3>Private consultation</h3>
+      <p class="muted small">A 15-minute call about bespoke themes, large orders or corporate gifting. There’s no obligation.</p>
+      ${[['topic', 'Topic', ['Bespoke theme', 'Large order', 'Corporate gifting', 'Something else']], ['when', 'When', ['Today', 'Tomorrow', 'This week']], ['time', 'Time', ['Morning', 'Afternoon', 'Evening']]].map(([g, l, o]) => `<div class="tiny muted mt16">${l}</div><div class="chips" style="padding:8px 0 0">${o.map((v, i) => `<button class="chip ${i === 0 ? 'on' : ''}" data-act="consult-pick" data-g="${g}" data-v="${v}">${v}</button>`).join('')}</div>`).join('')}
+      <label class="field mt16"><span>Mobile</span><input id="cs-phone" type="tel" inputmode="tel" value="${esc(S.contact.phone)}" placeholder="(212) 555-0142"></label>
+      <button class="btn mt16" data-act="consult-send">Request a call</button>`);
+  },
+  'consult-pick'(el) { document.querySelectorAll(`[data-act=consult-pick][data-g=${el.dataset.g}]`).forEach(c => c.classList.toggle('on', c === el)); },
+  'consult-send'() {
+    if ($('#cs-phone').value.replace(/\D/g, '').length < 10) return toast('Please add a mobile number');
+    const pick = g => document.querySelector(`[data-act=consult-pick][data-g=${g}].on`).dataset.v.toLowerCase();
+    const when = pick('when'), time = pick('time'), topic = pick('topic');
+    addLetter('concierge', 'Consultation requested', `The concierge will call you ${when}, in the ${time}, about ${topic}.`, '#/letters');
+    closeSheet(); toast('We’ll call you ' + when); render();
+  },
   soon() { toast('Not part of this demo'); },
   reset() {
     openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>

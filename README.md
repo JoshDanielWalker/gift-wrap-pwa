@@ -81,3 +81,13 @@ A private invitation rather than a referral link: each member has a personal cod
 - **Tokens**: colour, gutter, radius, elevation and easing live in `:root`; the gold used for small text is darkened to meet WCAG AA on ivory.
 - **Components**: one button hierarchy (primary / ghost / danger, `.sm`), one card and "letter" surface, one list-row pattern (icon medallion, hairline separators), shared `pagehead` for tab pages, consistent chips, fields and toggles.
 - **Experience**: directional page transitions (forward / back / tab fade), scroll position remembered on tab pages, topbar hairline on scroll, "Securing the diary…" state on booking, inline validation on contact details, step names in the booking flow, selected-state labels on packages, press and hover states, refined gift illustration and monogram.
+
+## Time, craft and status
+- **Time returned**: a quiet line ("Returns about 3 hr 48 min to your day") on the customize step, review, confirmation and booking page; tap for how it's estimated (materials sourcing + premium-finish wrapping + tidying, less ~10 minutes to hand over). Account shows the cumulative hours returned.
+- **Themes**: six named collections (Noir Gala, Ivory Heirloom, Blush Atelier, Emerald Reserve, Midnight Celebration and the numbered **Bordeaux Edition**, a limited winter run with a live "x of 60 remaining" count). Each lists its paper, ribbon and finish; Camille recommends a theme for the occasion. "The craft behind every wrap" explains the materials and technique.
+- **Monogram**: add up to three initials when a wax seal is chosen.
+- **Ribbon Circle tiers**: Member → Silver (3 appointments) → Gold (6) → Noir (12), with progress on the Account tab. Silver and above enjoy a complimentary service fee; Noir also waives the same-day fee.
+- **Certificate of Wrapping**: every completed booking has a numbered, printable certificate signed by Camille.
+- **Private consultation**: request a 15-minute concierge call (bespoke themes, large orders, corporate gifting), reachable from Help and each package.
+- **The Ribbon Guarantee**: if anything isn't perfect, Camille returns within 24 hours at no charge.
+- **Finish time** on every appointment card, and a "Your time with Camille" summary (appointments, gifts wrapped, hours returned).
