@@ -101,6 +101,7 @@ const ICONS = {
   bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', sparkle: '<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 13h18M12 9C8 9 7 4 10 4s2 5 2 5zm0 0c4 0 5-5 2-5s-2 5-2 5z"/>',
   card: '<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/>', share: '<path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"/>',
+  gem: '<path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M10 3L8 9l4 12M14 3l2 6-4 12"/>',
   reset: '<path d="M4 4v6h6M4.5 15a8 8 0 100-6"/>', star: '<path d="M12 2l3 7 7.5.6-5.7 5 1.8 7.4L12 18l-6.6 4 1.8-7.4-5.7-5L9 9z"/>',
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -119,10 +120,21 @@ function gift(palId, size) {
 
 /* ---------- State ---------- */
 const KEY = 'ribbon-demo-v3', ACC_KEY = 'ribbon-accounts-v1';
-const DEFAULT_PREFS = () => ({ sms: true, email: true, holiday: false });
+const DEFAULT_PREFS = () => ({ sms: true, email: true, holiday: false, occ: true });
 /** A visitor starts as a guest: nothing saved, nothing required. */
-const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, bookings: [], saved: [], cards: [], giftcards: [],
+const guestState = () => ({ user: null, contact: { name: '', email: '', phone: '' }, draft: null, bookings: [], occasions: [], saved: [], cards: [], giftcards: [],
   prefs: DEFAULT_PREFS(), waitlist: {}, bkTab: 'up' });
+const plusDays = n => { const x = new Date(); x.setDate(x.getDate() + n); return x; };
+/** Sample remembered occasions, dated relative to today so the demo always has something upcoming. */
+function demoOccasions() {
+  const at = (n, yearsBack) => { const x = plusDays(n); x.setFullYear(x.getFullYear() - (yearsBack || 0)); return iso(x); };
+  const snap = (daysAgo, pkg, gifts, palette, addons, items) => ({ date: iso(plusDays(-daysAgo)), pkg, gifts, palette, addons, items, address: { ...SAVED[0] }, total: 124.4 });
+  return [
+    { id: 'o-mum', kind: 'Birthday', who: 'Mum', date: at(12, 70), history: [snap(353, 'signature', 4, 'ivory', ['calli'], [{ who: 'Mum', what: 'Jewellery' }])] },
+    { id: 'o-ann', kind: 'Anniversary', who: 'James & Josh', date: at(52, 25), history: [snap(313, 'atelier', 3, 'emerald', ['flora', 'seal'], [])] },
+    { id: 'o-ele', kind: 'Birthday', who: 'Eleanor', date: at(150), history: [snap(215, 'classic', 3, 'blush', [], [])] },
+  ];
+}
 /** The demo "returning client": sample history that loads when signing in as the demo account. */
 function returningClient() {
   const d = new Date(); d.setDate(d.getDate() - 21);
@@ -132,12 +144,12 @@ function returningClient() {
     createdAt: date.getTime() - 86400000 * 3, pay: 'visa', contact: { name: 'Josh Walker', email: DEMO_EMAIL, phone: '(212) 555-0142' },
   });
   return { bookings: [mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4), mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8)],
-    saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })) };
+    saved: SAVED.map(a => ({ ...a })), cards: PAYMENTS.map(p => ({ ...p })), occasions: demoOccasions() };
 }
 let S, ACC;
 try { S = JSON.parse(localStorage.getItem(KEY)) || guestState(); } catch { S = guestState(); }
 try { ACC = JSON.parse(localStorage.getItem(ACC_KEY)) || {}; } catch { ACC = {}; }
-const ACCT_FIELDS = ['user', 'contact', 'bookings', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
+const ACCT_FIELDS = ['user', 'contact', 'bookings', 'occasions', 'saved', 'cards', 'giftcards', 'prefs', 'waitlist'];
 const save = () => {
   try {
     localStorage.setItem(KEY, JSON.stringify(S));
@@ -156,12 +168,13 @@ function createAccount({ name, email, phone }) {
 }
 function signIn(email) {
   email = email.trim().toLowerCase();
-  const guestBookings = S.user ? [] : S.bookings, draft = S.draft;
+  const guestBookings = S.user ? [] : S.bookings, guestOcc = S.user ? [] : S.occasions, draft = S.draft;
   const acct = ACC[email] || (email === DEMO_EMAIL
     ? { ...guestState(), ...returningClient(), user: { name: 'Josh Walker', email, phone: '(212) 555-0142', since: Date.now() - 86400000 * 120 } }
     : { ...guestState(), user: { name: nameFromEmail(email), email, phone: S.contact.phone || '', since: Date.now() } });
   S = { ...guestState(), ...acct, draft, bkTab: 'up' };
   S.bookings = [...guestBookings, ...(acct.bookings || [])];
+  S.occasions = [...guestOcc, ...(acct.occasions || [])];
   S.contact = { name: S.user.name, email, phone: S.user.phone || '' }; save();
 }
 function signOut() { save(); S = guestState(); save(); }
@@ -177,7 +190,7 @@ function firstOpenDate(mins = 75, ign) {
 }
 function newDraft(pkgId) {
   const p = pkgOf(pkgId || 'signature');
-  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], date: firstOpenDate(p.mins), time: null,
+  return { pkg: p.id, gifts: p.incl, occasion: 'Birthday', palette: 'noir', addons: [], note: '', cardmsg: '', items: [], photos: [], remember: false, remWho: '', remDate: '', occId: null, perk: false, date: firstOpenDate(p.mins), time: null,
     address: null, promo: '', tip: 0.1, pay: S.cards[0]?.id || WALLET.id };
 }
 const draft = () => S.draft || (S.draft = newDraft());
@@ -191,10 +204,11 @@ function quote(d) {
   const base = p.price + extra + addons;
   const rate = PROMOS[(d.promo || '').toUpperCase()] || 0;
   const discount = base * rate;
-  const taxable = base - discount + asap + SERVICE_FEE;
+  const perk = d.perk && d.addons.includes('seal') ? ADDONS.find(a => a.id === 'seal').price : 0;
+  const taxable = base - discount - perk + asap + SERVICE_FEE;
   const tax = taxable * TAX;
   const tip = (p.price + extra) * (d.tip || 0);
-  return { p, extra, addons, asap, base, discount, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
+  return { p, extra, addons, asap, base, discount, perk, fee: SERVICE_FEE, tax, tip, total: taxable + tax + tip };
 }
 const OPEN_H = 9, CLOSE_H = 20, BUFFER = 30, LEAD_MIN = 90;
 /** Appointment length: package time plus 8 min for each gift beyond those included. */
@@ -251,7 +265,7 @@ function closeSheet() { $('#sheetbg')?.remove(); }
 
 function tabbar(active) {
   const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}">${ic(n)}${l}</a>`;
-  return `<nav class="tabs">${t('', 'home', 'Home')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
+  return `<nav class="tabs">${t('', 'home', 'Home')}${t('occasions', 'gem', 'Occasions')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
 }
 const STEPS = ['packages', 'customize', 'schedule', 'address', 'review'];
 function flow(step, title, sub, body, cta) {
@@ -270,18 +284,26 @@ function flow(step, title, sub, body, cta) {
 const routes = [];
 const route = (re, fn) => routes.push([re, fn]);
 
+/** The soonest remembered occasion inside the reminder window, unless snoozed or switched off. */
+function letterFor() {
+  if (S.prefs.occ === false) return '';
+  const hit = S.occasions.map(o => [o, nextOcc(o)]).filter(([o, n]) => n.days <= 60 && !(o.snooze && o.snooze > iso(new Date()))).sort((a, b) => a[1].days - b[1].days)[0];
+  if (hit) return occLetter(hit[0]);
+  return !S.occasions.length && S.bookings.length ? `<div class="pad mt24"><a class="card row" href="#/occasions" style="border-color:var(--gold2)">${ic('gem')}<div class="grow small"><b>Let us remember for you</b><div class="muted">Tell us the dates that matter and Camille will write ahead each year.</div></div>${ic('chev')}</a></div>` : '';
+}
 route(/^$/, () => {
   const up = S.bookings.filter(b => b.status !== 'done' && b.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
   const last = S.bookings.filter(b => b.status === 'done').sort((a, b) => b.date.localeCompare(a.date))[0];
   return { tab: '', html: `<div class="screen">
-    <div class="hero"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
+    <div class="hero ${S.user && S.bookings.length ? 'compact' : ''}"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
       <h1>The art of<br><em>giving,</em> perfected.</h1>
       <p class="muted">Camille, our master wrapper, comes to your home or office and dresses every gift as if it were jewellery.</p>
-      <div class="heroart">${gift('ivory')}</div>
+      ${S.user && S.bookings.length ? '' : `<div class="heroart">${gift('ivory')}</div>`}
       <button class="btn" data-act="start">Book an appointment</button>
       <p class="tiny muted mt16">Manhattan · Brooklyn · Limited daily availability</p></div>
     ${installCard()}
     ${up ? `<span class="tiny eyebrow">Your next appointment</span><div class="stack mt8">${bookingCard(up)}</div>` : ''}
+    ${letterFor()}
     ${last ? `<div class="sec"><h3>Wrap again</h3></div><div class="stack"><button class="bk" data-act="rebook" data-id="${last.id}">${gift(last.palette)}<div class="grow"><b style="font-family:var(--serif);font-size:22px;font-weight:500">${pkgOf(last.pkg).name}</b>
       <div class="muted small">${last.gifts} gifts · ${palOf(last.palette).name} · ${money(last.total)}</div><span class="link">Book the same again</span></div></button></div>` : ''}
     <div class="sec"><h3>The collection</h3><a class="link" href="#/packages">View all</a></div>
@@ -319,6 +341,7 @@ route(/^customize$/, () => {
       <div class="stepper"><button data-act="gifts" data-d="-1" ${d.gifts <= 1 ? 'disabled' : ''} aria-label="Fewer">${ic('minus')}</button><b>${d.gifts}</b>
       <button data-act="gifts" data-d="1" ${d.gifts >= 30 ? 'disabled' : ''} aria-label="More">${ic('plus')}</button></div></div></div>
     <div class="sec"><h3>Occasion</h3></div><div class="chips">${OCCASIONS.map(o => `<button class="chip ${d.occasion === o ? 'on' : ''}" data-act="occasion" data-v="${o}">${o}</button>`).join('')}</div>
+    ${traditionBlock(d)}
     <div class="sec"><h3>Palette</h3></div><div class="swatches">${PALETTES.map(p => `<button class="sw ${d.palette === p.id ? 'on' : ''}" data-act="palette" data-id="${p.id}">
       <i style="background:${p.paper};--rib:${p.rib}"></i>${p.name}</button>`).join('')}</div>
     <div class="sec"><h3>Enhancements</h3></div><div class="stack">${ADDONS.map(a => `<button class="opt ${d.addons.includes(a.id) ? 'on' : ''}" data-act="addon" data-id="${a.id}">
@@ -422,6 +445,7 @@ route(/^review$/, () => {
       ${q.extra ? `<div class="line"><span>${d.gifts - q.p.incl} extra gifts</span><span>${money(q.extra)}</span></div>` : ''}
       ${d.addons.map(id => { const a = ADDONS.find(x => x.id === id); return `<div class="line"><span>${a.name}</span><span>${money(a.price)}</span></div>`; }).join('')}
       ${q.asap ? `<div class="line"><span>Same-day priority</span><span>${money(q.asap)}</span></div>` : ''}
+      ${q.perk ? `<div class="line disc"><span>Complimentary wax seal</span><span>−${money(q.perk)}</span></div>` : ''}
       ${q.discount ? `<div class="line disc"><span>Promo ${esc(d.promo.toUpperCase())}</span><span>−${money(q.discount)}</span></div>` : ''}
       <div class="line"><span>Service fee</span><span>${money(q.fee)}</span></div>
       <div class="line"><span>Tax</span><span>${money(q.tax)}</span></div>
@@ -445,13 +469,20 @@ function installCard(flat) {
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; if (/^(account)?$/.test(location.hash.replace(/^#\/?/, ''))) render(); });
 window.addEventListener('appinstalled', () => { deferredInstall = null; toast('Installed. Find us on your home screen.'); render(); });
 
+function occConfirm(b) {
+  const o = b.occId && S.occasions.find(x => x.id === b.occId); if (!o) return '';
+  const nx = nextOcc(o), yrs = (o.history || []).length;
+  return `<div class="letter mt16"><span class="tiny gold">${yrs > 1 ? `Year ${yrs} together` : 'A tradition begins'}</span>
+    <p style="font-size:20px">${yrs > 1 ? `This is your ${ordinal(yrs)} year wrapping ${occTitle(o)} with us. Thank you.` : `We’ll remember ${occTitle(o)}.`}</p>
+    <p class="small muted">Next ${dayShort(nx.iso)}${nx.milestone ? `, the ${nx.milestone}` : ''}. Camille will write to you three weeks before.</p></div>`;
+}
 /** Offered once, right after the booking: the details are already known, so it is a single tap. */
 function acctPrompt(b) {
   if (S.user) return `<div class="card row mt16">${ic('check')}<div class="grow small"><b>Saved to your Ribbon Circle account</b><div class="muted">A secure sign-in link was sent to ${esc(S.user.email)}.</div></div></div>`;
   if (b.noAcct) return '';
   return `<div class="card mt16" style="border-color:var(--gold2)"><span class="tiny gold">Ribbon Circle</span>
-    <h3 style="font-size:23px;margin:4px 0 6px">Book faster next time</h3>
-    <p class="muted small">We already have your name, email and address. Keep them, along with this booking, and your next appointment takes seconds.</p>
+    <h3 style="font-size:23px;margin:4px 0 6px">${S.occasions.length ? 'Keep your occasions safe' : 'Book faster next time'}</h3>
+    <p class="muted small">${S.occasions.length ? 'Create an account so Camille can remember your dates and write to you ahead of each one.' : 'We already have your name, email and address. Keep them, along with this booking, and your next appointment takes seconds.'}</p>
     <button class="btn mt16" data-act="quick-account" data-id="${b.id}">Create my account</button>
     <button class="link mt16" style="display:block;margin:12px auto 0;border:0;color:var(--muted)" data-act="dismiss-acct" data-id="${b.id}">Not now</button>
     <p class="tiny muted center mt8" style="letter-spacing:1px;text-transform:none;font-size:11px">No password to remember. We’ll email a secure sign-in link.</p></div>`;
@@ -469,7 +500,7 @@ route(/^confirmed\/([\w-]+)$/, id => {
       <div class="hline"></div><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div>
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
-      <p class="muted small mt16 center">Camille will message you the day before. Free changes up to 24 hours ahead.</p>${acctPrompt(b)}</div>
+      <p class="muted small mt16 center">Camille will message you the day before. Free changes up to 24 hours ahead.</p>${occConfirm(b)}${acctPrompt(b)}</div>
     <div class="cta"><a class="btn" href="#/track/${b.id}">View booking</a><div class="actions mt8"><button class="btn ghost" data-act="ics" data-id="${b.id}">Add to calendar</button><a class="btn ghost" href="#/">Done</a></div></div></div>` };
 });
 
@@ -495,7 +526,7 @@ route(/^bookings$/, () => {
 
 route(/^account$/, () => {
   const u = S.user, rows = u
-    ? [['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
+    ? [['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
     : [['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
   const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
   return { tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
@@ -582,7 +613,7 @@ route(/^receipt\/([\w-]+)$/, id => {
   if (!b) return { redirect: '#/bookings' };
   const p = pkgOf(b.pkg), q = b.q, c = b.contact || {};
   const lines = q ? [[p.name, p.price], q.extra && [`${b.gifts - p.incl} extra gifts`, q.extra], ...(b.addons || []).map(id => { const a = ADDONS.find(x => x.id === id); return [a.name, a.price]; }),
-      q.asap && ['Same-day priority', q.asap], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], ['Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
+      q.asap && ['Same-day priority', q.asap], q.perk && ['Complimentary wax seal', -q.perk], q.discount && [`Promo ${q.promo.toUpperCase()}`, -q.discount], ['Service fee', q.fee], ['Tax', q.tax], q.tip && ['Gratuity', q.tip]].filter(Boolean)
     : [[p.name, p.price], ['Service, tax & gratuity', b.total - p.price]];
   return { html: `<div class="screen" style="padding-bottom:40px"><div class="topbar noprint"><a class="iconbtn" href="#/track/${b.id}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Receipt</div></div>
     <div class="pad"><div class="receipt"><div class="center"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div></div><div class="hline"></div>
@@ -603,6 +634,99 @@ route(/^track\/([\w-]+)$/, id => {
   return { html: bookingView(b) };
 });
 
+
+/* ---------- Occasions: remembered annual dates ---------- */
+const ANNUAL = ['Birthday', 'Anniversary', 'Wedding'];
+const GEMS = { 1: 'Paper', 2: 'Cotton', 5: 'Wood', 10: 'Tin', 15: 'Crystal', 20: 'China', 25: 'Silver', 30: 'Pearl', 35: 'Coral', 40: 'Ruby', 45: 'Sapphire', 50: 'Golden', 55: 'Emerald', 60: 'Diamond' };
+const ordinal = n => { const t = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (t[(v - 20) % 10] || t[v] || t[0]); };
+const occTitle = o => o.kind === 'Birthday' ? `${esc(o.who)}’s birthday` : `${o.who ? esc(o.who) + ' · ' : ''}anniversary`;
+/** Next occurrence of an annual date, with milestone detail when the original year is known. */
+function nextOcc(o) {
+  const [y, m, d] = o.date.split('-').map(Number), today = fromIso(iso(new Date()));
+  const at = Y => { const dt = new Date(Y, m - 1, d); return dt.getMonth() === m - 1 ? dt : new Date(Y, m - 1, 28); };
+  let yr = today.getFullYear(), dt = at(yr); if (dt < today) dt = at(++yr);
+  const n = y && y < yr ? yr - y : null; let line = null, milestone = null;
+  if (n) {
+    if (o.kind === 'Birthday') { line = `Turning ${n}`; if (n % 10 === 0 || n === 18 || n === 21) milestone = `${ordinal(n)} birthday`; }
+    else { line = `${ordinal(n)} anniversary`; if (GEMS[n]) milestone = `${GEMS[n]} anniversary`; }
+  }
+  return { iso: iso(dt), days: Math.round((dt - today) / 86400000), n, line, milestone };
+}
+const lastWrap = o => (o.history || [])[(o.history || []).length - 1];
+const occMins = o => { const l = lastWrap(o); return l ? pkgOf(l.pkg).mins : 75; };
+/** How many days before the occasion Camille still has an opening. */
+function openingsBefore(o) {
+  const nx = nextOcc(o), mins = occMins(o); let n = 0, first = null;
+  for (let i = 0; i < Math.min(Math.max(nx.days, 1), 60); i++) { const k = iso(plusDays(i)); if (openCount(k, mins)) { n++; first ||= k; } }
+  return { n, first };
+}
+const availLine = o => { const a = openingsBefore(o); return a.n ? `Camille has ${a.n} day${a.n > 1 ? 's' : ''} with openings before the occasion, the first on ${dayShort(a.first)}.` : 'Camille is fully booked before the day. Reserve soon or join the waiting list.'; };
+const lastLine = o => { const l = lastWrap(o); if (!l) return ''; const a = (l.addons || []).filter(id => id !== 'card' && ADDONS.find(x => x.id === id)).map(id => ADDONS.find(x => x.id === id).name.toLowerCase());
+  return `${pkgOf(l.pkg).name} in ${palOf(l.palette).name}${a.length ? ', with ' + a.join(' and ') : ''}`; };
+/** A personal note from Camille, shown when a remembered date is approaching. */
+function occLetter(o) {
+  const nx = nextOcc(o), first = firstName(), l = lastWrap(o);
+  const when = nx.days === 0 ? 'is today' : nx.days === 1 ? 'is tomorrow' : `is ${nx.days} days away`;
+  return `<div class="pad mt24"><div class="letter"><span class="tiny gold">A note from Camille</span>
+    <p class="hello">${first ? 'Dear ' + esc(first) + ',' : 'Hello,'}</p>
+    <p>${occTitle(o).replace(/^./, c => c.toUpperCase())} ${when}, on ${dayLong(nx.iso)}.${nx.milestone ? ` A milestone worth marking: the <b>${nx.milestone}</b>.` : ''}</p>
+    ${l ? `<p>I remember your last visit: ${lastLine(o)}. I’d be honoured to wrap it again, perhaps with something new.</p>` : ''}
+    <p class="small muted">${availLine(o)}</p>
+    <button class="btn mt16" data-act="occ-book" data-id="${o.id}">Reserve Camille</button>
+    <button class="link" style="display:block;margin:14px auto 0;border:0;color:var(--muted)" data-act="occ-snooze" data-id="${o.id}">Remind me later</button></div></div>`;
+}
+function occCard(o) {
+  const nx = nextOcc(o), dt = fromIso(nx.iso), l = lastWrap(o);
+  return `<div class="occ ${nx.milestone ? 'mile' : ''}"><div class="row" style="align-items:flex-start">
+    <div class="occdate"><b>${dt.getDate()}</b><small>${dt.toLocaleDateString('en-US', { month: 'short' })}</small></div>
+    <div class="grow"><div class="tiny gold">${nx.milestone ? '✦ ' + nx.milestone : o.kind}</div>
+      <div style="font-family:var(--serif);font-size:23px;line-height:1.15">${occTitle(o).replace(/^./, c => c.toUpperCase())}</div>
+      <div class="muted small">${nx.days === 0 ? 'Today' : nx.days === 1 ? 'Tomorrow' : 'In ' + nx.days + ' days'}${nx.line ? ' · ' + nx.line : ''}</div>
+      ${l ? `<div class="muted small mt8">Last wrapped ${dayShort(l.date)}: ${lastLine(o)}</div>` : ''}</div></div>
+    <div class="actions mt16"><button class="btn sm" data-act="occ-book" data-id="${o.id}">Reserve</button><button class="btn sm ghost" data-act="occ-edit" data-id="${o.id}">Edit</button></div></div>`;
+}
+route(/^occasions$/, () => {
+  const list = S.occasions.map(o => [o, nextOcc(o)]).sort((a, b) => a[1].days - b[1].days);
+  return { tab: 'occasions', html: `<div class="screen"><span class="tiny eyebrow" style="padding-top:calc(30px + var(--safe-t))">Remembered</span>
+    <h1 class="title" style="padding-top:6px">Your occasions</h1>
+    <p class="sub">The dates that matter, kept for you. Three weeks ahead, Camille will write so your appointment is secured in good time.</p>
+    ${list.length ? `<div class="stack">${list.map(([o]) => occCard(o)).join('')}</div>` : `<div class="empty" style="padding-top:20px">${gift('ivory')}<p class="mt16">No occasions yet.<br>Tell us a date that matters and we’ll remember it every year.</p></div>`}
+    <div class="pad mt16"><button class="btn ghost" data-act="occ-add">${ic('plus')} Remember a new occasion</button></div>
+    <div class="sec"><h3>The season of giving</h3></div>
+    <div class="stack"><button class="season" data-act="start" data-pkg="signature" data-occ="Holiday"><span class="tiny">Every December</span><b>Holiday wrapping</b><span class="small">Camille’s December diary opens first to those who’ve booked before.</span></button></div>
+    <div class="sec"><h3>How we remember</h3></div>
+    <div class="how"><div><i>I</i><span><b>You tell us once</b><span class="muted small">Add a date when you book, or here, at any time.</span></span></div>
+      <div><i>II</i><span><b>We write ahead</b><span class="muted small">A personal note arrives three weeks before, with Camille’s availability.</span></span></div>
+      <div><i>III</i><span><b>Your wrap, remembered</b><span class="muted small">We keep your palette and finishing touches, and reward each returning year.</span></span></div></div>
+  </div>${tabbar('occasions')}` };
+});
+
+/** Customize step: invite a first-time tradition, or celebrate a returning one. */
+function traditionBlock(d) {
+  if (d.occId) {
+    const o = S.occasions.find(x => x.id === d.occId); if (!o) return '';
+    const l = lastWrap(o), tried = (l?.addons || []), idea = ADDONS.find(a => a.id !== 'card' && !tried.includes(a.id) && !d.addons.includes(a.id));
+    return `<div class="pad mt16"><div class="letter" style="text-align:left"><span class="tiny gold">Your tradition · ${occTitle(o)}</span>
+      <p style="font-size:19px">${l ? `Last time: ${lastLine(o)}. We’ve kept your choices.` : 'We’ll remember this occasion each year.'}</p>
+      ${d.perk ? `<p class="small" style="color:var(--ok)">${ic('check')} A complimentary monogram wax seal is included, with our thanks.</p>` : ''}
+      ${idea ? `<p class="small muted">Something new this year? <a class="link" data-act="addon" data-id="${idea.id}">${idea.name} · +${money(idea.price)}</a></p>` : ''}</div></div>`;
+  }
+  if (!ANNUAL.includes(d.occasion)) return '';
+  return `<div class="pad mt16"><div class="card" style="${d.remember ? 'border-color:var(--ink)' : ''}"><button class="row" style="width:100%;text-align:left" data-act="remember-toggle"><span class="check ${d.remember ? 'on' : ''}">${ic('check')}</span>
+    <span class="grow"><b style="font-family:var(--serif);font-size:19px;font-weight:500">Make it a tradition</b><span class="muted small" style="display:block">We’ll remember this ${d.occasion.toLowerCase()} and write to you three weeks ahead each year.</span></span></button>
+    ${d.remember ? `<div style="display:grid;gap:10px;margin-top:14px"><label class="field"><span>${d.occasion === 'Birthday' ? 'Whose birthday?' : 'Whose anniversary?'}</span><input data-bind="remWho" value="${esc(d.remWho)}" placeholder="${d.occasion === 'Birthday' ? 'Mum' : 'Sarah & James'}"></label>
+      <label class="field"><span>Date (add the original year for milestones)</span><input type="date" data-bind="remDate" value="${esc(d.remDate)}"></label></div>` : ''}</div></div>`;
+}
+function occSheet(id) {
+  const o = id ? S.occasions.find(x => x.id === id) : null; pendKind = o ? o.kind : 'Birthday';
+  openSheet(`<h3>${o ? 'Edit occasion' : 'Remember an occasion'}</h3>
+    <div class="chips" style="padding:0">${ANNUAL.map(k => `<button class="chip ${k === pendKind ? 'on' : ''}" data-act="occ-kind" data-v="${k}">${k}</button>`).join('')}</div>
+    <div style="display:grid;gap:10px" class="mt16"><label class="field"><span id="oc-lbl">${pendKind === 'Birthday' ? 'Whose birthday?' : 'Who is celebrating?'}</span><input id="oc-who" value="${esc(o?.who || '')}" placeholder="Mum"></label>
+      <label class="field"><span>Date (add the original year for milestones)</span><input id="oc-date" type="date" value="${esc(o?.date || '')}"></label>
+      <button class="btn" data-act="occ-save" data-id="${id || ''}">Remember this date</button>
+      ${o ? `<button class="btn danger" data-act="occ-del" data-id="${id}">Remove</button>` : ''}</div>`);
+}
+let pendKind = 'Birthday';
 
 /* ---------- Account sub-pages ---------- */
 const sub = (title, intro, body, back = '#/account') => ({ html: `<div class="screen"><div class="topbar"><a class="iconbtn" href="${back}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Account</div></div>
@@ -633,7 +757,7 @@ route(/^help$/, () => sub('Concierge &amp; help', 'Our team is available daily f
   <div class="sec"><h3>Our policy</h3></div><div class="pad"><p class="muted small">Cancel or reschedule free of charge up to 24 hours before your appointment. Within 24 hours a 50% fee applies. If we’re unable to deliver the service, you are never charged.</p></div>`));
 
 route(/^prefs$/, () => sub('Notifications', 'Choose how we keep you informed.',
-  `<div class="pad">${[['sms', 'Text reminders', 'The day before, and when your wrapper is on the way'], ['email', 'Email receipts', 'Confirmations and receipts'], ['holiday', 'Seasonal invitations', 'Early access to holiday dates']].map(([k, t, d]) =>
+  `<div class="pad">${[['occ', 'Occasion reminders', 'A personal note three weeks before each remembered date'], ['sms', 'Text reminders', 'The day before, and when your wrapper is on the way'], ['email', 'Email receipts', 'Confirmations and receipts'], ['holiday', 'Seasonal invitations', 'Early access to holiday dates']].map(([k, t, d]) =>
     `<button class="acct" data-act="pref" data-k="${k}"><span class="grow"><b>${t}</b><span class="muted small" style="display:block">${d}</span></span><span class="toggle ${S.prefs[k] ? 'on' : ''}"><i></i></span></button>`).join('')}</div>`));
 
 /* ---------- Router ---------- */
@@ -678,7 +802,7 @@ function authSheet(mode) {
       <button class="btn mt16" data-act="auth-code">Sign in</button><p class="muted small center mt8">Demo: any 6 digits will work.</p></div></div>`);
 }
 const actions = {
-  start(el) { if (!S.draft || S.draft.resched || el.dataset.pkg) S.draft = newDraft(el.dataset.pkg); save(); location.hash = el.dataset.pkg ? '#/customize' : '#/packages'; },
+  start(el) { if (!S.draft || S.draft.resched || el.dataset.pkg) S.draft = newDraft(el.dataset.pkg); if (el.dataset.occ) S.draft.occasion = el.dataset.occ; save(); location.hash = el.dataset.pkg ? '#/customize' : '#/packages'; },
   exit() { S.draft = null; save(); },
   'pick-pkg'(el) { const p = pkgOf(el.dataset.id), d = draft(); d.pkg = p.id; d.gifts = p.incl; if (!timeStillFree(d)) d.time = null; save(); render(); },
   gifts(el) { const d = draft(); d.gifts = Math.min(30, Math.max(1, d.gifts + +el.dataset.d)); if (!timeStillFree(d)) d.time = null; save(); render(); },
@@ -699,7 +823,12 @@ const actions = {
     if (!contactOk()) return;
     const d = draft(), q = quote(d);
     const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
-      contact: { ...S.contact }, q: (({ extra, addons, asap, discount, fee, tax, tip, total }) => ({ extra, addons, asap, discount, fee, tax, tip, total, promo: d.promo }))(q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+      contact: { ...S.contact }, q: (({ extra, addons, asap, discount, perk, fee, tax, tip, total }) => ({ extra, addons, asap, discount, perk, fee, tax, tip, total, promo: d.promo }))(q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+    const snap = { date: b.date, pkg: b.pkg, gifts: b.gifts, palette: b.palette, addons: b.addons, items: b.items, address: b.address, total: b.total };
+    let o = d.occId && S.occasions.find(x => x.id === d.occId);
+    if (o) (o.history ||= []).push(snap);
+    else if (d.remember && d.remDate && (d.remWho.trim() || d.occasion !== 'Birthday')) { o = { id: 'o' + Date.now(), kind: d.occasion, who: d.remWho.trim(), date: d.remDate, history: [snap] }; S.occasions.push(o); }
+    if (o) b.occId = o.id;
     S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
     location.hash = '#/confirmed/' + b.id;
   },
@@ -855,6 +984,29 @@ const actions = {
     try { await navigator.clipboard.writeText(text + ' ' + location.origin + location.pathname); toast('Copied to clipboard'); } catch { toast('Sharing isn’t available here'); }
   },
   'review-save'(el) { const v = $('#rv').value.trim(); if (!v) return toast('Write a few words first'); S.bookings.find(x => x.id === el.dataset.id).review = v; save(); render(); toast('Thank you for your review'); },
+  'remember-toggle'() { const d = draft(); d.remember = !d.remember; save(); render(); },
+  'occ-add'() { occSheet(); },
+  'occ-edit'(el) { occSheet(el.dataset.id); },
+  'occ-kind'(el) { pendKind = el.dataset.v; document.querySelectorAll('[data-act=occ-kind]').forEach(c => c.classList.toggle('on', c === el)); $('#oc-lbl').textContent = pendKind === 'Birthday' ? 'Whose birthday?' : 'Who is celebrating?'; },
+  'occ-save'(el) {
+    const who = $('#oc-who').value.trim(), date = $('#oc-date').value;
+    if (pendKind === 'Birthday' && !who) return toast('Whose birthday is it?');
+    if (!date) return toast('Please choose the date');
+    const o = el.dataset.id && S.occasions.find(x => x.id === el.dataset.id);
+    if (o) Object.assign(o, { kind: pendKind, who, date }); else S.occasions.push({ id: 'o' + Date.now(), kind: pendKind, who, date, history: [] });
+    save(); closeSheet(); render(); toast('We’ll remember it');
+  },
+  'occ-del'(el) { S.occasions = S.occasions.filter(x => x.id !== el.dataset.id); save(); closeSheet(); render(); toast('Occasion removed'); },
+  'occ-snooze'(el) { S.occasions.find(x => x.id === el.dataset.id).snooze = iso(plusDays(7)); save(); render(); toast('We’ll remind you next week'); },
+  'occ-book'(el) {
+    const o = S.occasions.find(x => x.id === el.dataset.id), l = lastWrap(o), d = newDraft(l ? l.pkg : 'signature'), nx = nextOcc(o);
+    Object.assign(d, { occasion: o.kind === 'Wedding' ? 'Wedding' : o.kind, occId: o.id, items: (l?.items || []).map(i => ({ ...i })) });
+    if (l) Object.assign(d, { gifts: l.gifts, palette: l.palette, addons: (l.addons || []).filter(id => id !== 'card'), address: l.address ? { ...l.address } : null });
+    if (l) { d.perk = true; if (!d.addons.includes('seal')) d.addons.push('seal'); }
+    const mins = durMins(d); d.date = firstOpenDate(mins);
+    for (let i = 0; i < Math.min(nx.days, 60); i++) { const k = iso(plusDays(i)); if (openCount(k, mins)) { d.date = k; break; } }
+    S.draft = d; save(); location.hash = '#/customize';
+  },
   soon() { toast('Not part of this demo'); },
   reset() {
     openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>

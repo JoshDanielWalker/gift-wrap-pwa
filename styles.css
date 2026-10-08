@@ -254,3 +254,18 @@ a.acct{color:inherit}
   .noprint,.tabs,#toast{display:none!important}
   .receipt{border:0}
 }
+
+/* v6: occasions */
+.letter{position:relative;background:var(--card);border:1px solid var(--ink);padding:26px 22px;text-align:center}
+.letter::before{content:"";position:absolute;inset:5px;border:1px solid var(--line);pointer-events:none}
+.letter>*{position:relative}
+.letter p{font-family:var(--serif);font-size:20px;line-height:1.35;margin:10px 0 0}
+.letter .hello{font-style:italic;font-size:24px;margin-top:14px}
+.occ{background:var(--card);border:1px solid var(--line);padding:18px;border-radius:2px}
+.occ.mile{border-color:var(--gold2);background:linear-gradient(#fbf3e2,var(--card) 60%)}
+.occdate{width:58px;flex:none;text-align:center;border-right:1px solid var(--line);padding-right:14px;margin-right:2px}
+.occdate b{display:block;font-family:var(--serif);font-size:32px;font-weight:500;line-height:1}
+.occdate small{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold)}
+.tabs a{min-width:0}
+.letter p.small{font-family:var(--sans);font-size:13px;font-style:normal;line-height:1.5}
+.hero.compact{padding-bottom:6px}.hero.compact h1{font-size:36px;margin:26px 0 8px}.hero.compact>p{display:none}.hero.compact .btn{margin-top:16px}.hero.compact .tiny{display:none}
