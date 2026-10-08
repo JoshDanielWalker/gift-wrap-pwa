@@ -41,3 +41,6 @@ Camille is the only wrapper, so the calendar is a single shared resource:
 - **After the booking is confirmed** — when the benefit is obvious — a one-tap "Create my account" card appears. It is passwordless and re-uses the details and address already given. "Not now" dismisses it for good.
 - The Account tab and an empty Bookings tab carry a quiet invitation; nothing blocks or nags elsewhere.
 - Sign in with an email + 6-digit code (any digits work). **Use the demo account** loads Josh Walker with two past bookings, saved addresses and cards; any email you created earlier comes back with its bookings. Guest bookings are merged into the account on sign-in.
+
+## Deploy (GitHub Pages)
+`.github/workflows/pages.yml` publishes the site on every push to `main`. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**. The site is then served at `https://<owner>.github.io/gift-wrap-pwa/` (all paths are relative, so the subpath works for the PWA install and service worker).
