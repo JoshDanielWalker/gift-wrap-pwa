@@ -12,10 +12,10 @@ button{background:none;border:0;padding:0;cursor:pointer}
 h1,h2,h3{font-family:var(--serif);font-weight:500;margin:0;letter-spacing:.2px}
 p{margin:0}
 a{color:inherit;text-decoration:none}
-#shell{position:relative;max-width:480px;height:100vh;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden}
+#shell{position:relative;width:100%;max-width:480px;height:100vh;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden}
 @media(min-width:560px){
   body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(#efe9dc,#ddd4c2)}
-  #shell{height:min(880px,96vh);border-radius:40px;border:1px solid #cfc5b0;box-shadow:0 30px 70px #3a2e1a33,0 0 0 8px #fffdf9}
+  #shell{width:430px;height:min(880px,96vh);border-radius:40px;border:1px solid #cfc5b0;box-shadow:0 30px 70px #3a2e1a33,0 0 0 8px #fffdf9}
 }
 #app{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;animation:enter .3s ease}
 #app::-webkit-scrollbar{display:none}
@@ -234,3 +234,6 @@ a.acct{color:inherit}
 
 .day.flag small:last-child{color:var(--gold);font-size:9px;letter-spacing:.8px}
 .day.on.flag small:last-child{color:#e0cfa5}
+
+@media(max-width:350px){.btn{letter-spacing:1.2px;font-size:11.5px;padding:15px 10px}.title{font-size:30px}.hero h1{font-size:38px}.slots{gap:8px}}
+.checklist.mt16{margin-top:16px}
