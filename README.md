@@ -44,3 +44,9 @@ Camille is the only wrapper, so the calendar is a single shared resource:
 
 ## Deploy (GitHub Pages)
 `.github/workflows/pages.yml` publishes the site on every push to `main`. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**. The site is then served at `https://<owner>.github.io/gift-wrap-pwa/` (all paths are relative, so the subpath works for the PWA install and service worker).
+
+## More features
+- **Your gifts**: list what's being wrapped (recipient + type) and attach up to 3 photos (resized in-browser); shown on the booking page so Camille arrives prepared.
+- **Booking page**: countdown ("Tomorrow", "In 3 days"), Share (Web Share, falling back to copy), written review after rating.
+- **Receipts**: itemised, printable / save-as-PDF.
+- **Install prompt**: native install button on Chromium, "Add to Home Screen" hint on iOS Safari; dismissible.

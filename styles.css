@@ -67,7 +67,7 @@ svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.4;str
 .field span{display:block;font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .field input,.field textarea{width:100%;background:none;border:0;outline:0;resize:none;padding:2px 0}
 .field input::placeholder,.field textarea::placeholder{color:#b3a996}
-.stack{display:grid;gap:12px;padding:0 24px}
+.stack{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:0 24px}
 .hline{height:1px;background:var(--line);margin:16px 0}
 
 /* home */
@@ -237,3 +237,20 @@ a.acct{color:inherit}
 
 @media(max-width:350px){.btn{letter-spacing:1.2px;font-size:11.5px;padding:15px 10px}.title{font-size:30px}.hero h1{font-size:38px}.slots{gap:8px}}
 .checklist.mt16{margin-top:16px}
+
+/* v5 additions */
+.photos{display:flex;gap:10px;flex-wrap:wrap}
+.ph{position:relative;width:86px;height:86px;border-radius:2px;overflow:hidden;border:1px solid var(--line);background:var(--card)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph button{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:#1c1814cc;color:#fff;display:grid;place-items:center}
+.ph button svg{width:12px;height:12px}
+.ph.add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-style:dashed;color:var(--muted);cursor:pointer}
+.receipt{background:var(--card);border:1px solid var(--line);padding:26px 22px}
+@media print{
+  html,body{background:#fff}
+  body{display:block}
+  #shell{height:auto;width:auto;max-width:none;overflow:visible;border:0;box-shadow:none;border-radius:0;background:#fff}
+  #app{position:static;overflow:visible;animation:none}
+  .noprint,.tabs,#toast{display:none!important}
+  .receipt{border:0}
+}
