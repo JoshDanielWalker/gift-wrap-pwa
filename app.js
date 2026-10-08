@@ -111,13 +111,24 @@ const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hid
 function gift(palId, size) {
   const p = palOf(palId);
   return `<svg class="gift" viewBox="0 0 120 120" ${size ? `width="${size}" height="${size}"` : ''} aria-hidden="true">
-    <ellipse cx="60" cy="108" rx="40" ry="5" fill="#000" opacity=".12"/>
-    <rect x="18" y="56" width="84" height="48" rx="4" fill="${p.paper}" stroke="${p.rib}" stroke-opacity=".5"/>
-    <rect x="12" y="42" width="96" height="20" rx="4" fill="${p.paper}" stroke="${p.rib}" stroke-opacity=".7"/>
-    <rect x="53" y="42" width="14" height="62" fill="${p.rib}"/><rect x="12" y="48" width="96" height="6" fill="${p.rib}" opacity=".0"/>
-    <path d="M60 42C40 42 26 32 34 21c7-8 22 2 26 21zM60 42c20 0 34-10 26-21-7-8-22 2-26 21z" fill="none" stroke="${p.rib}" stroke-width="5" stroke-linejoin="round"/>
-    <circle cx="60" cy="42" r="5" fill="${p.rib}"/></svg>`;
+    <defs><linearGradient id="gShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#000" stop-opacity=".14"/></linearGradient>
+    <linearGradient id="gSheen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient></defs>
+    <ellipse cx="60" cy="109" rx="40" ry="4.5" fill="#3a2a10" opacity=".16"/>
+    <rect x="20" y="58" width="80" height="48" rx="1.5" fill="${p.paper}"/><rect x="20" y="58" width="80" height="48" rx="1.5" fill="url(#gShade)" stroke="${p.rib}" stroke-opacity=".35"/>
+    <rect x="14" y="44" width="92" height="18" rx="1.5" fill="${p.paper}"/><rect x="14" y="44" width="92" height="18" rx="1.5" fill="url(#gShade)" stroke="${p.rib}" stroke-opacity=".5"/>
+    <rect x="20" y="62" width="80" height="3.5" fill="#000" opacity=".1"/>
+    <rect x="52" y="44" width="16" height="62" fill="${p.rib}"/><rect x="52" y="44" width="16" height="62" fill="url(#gSheen)"/>
+    <path d="M60 44C42 44 27 36 33 24c6-9 21 1 27 20z" fill="${p.rib}" fill-opacity=".1" stroke="${p.rib}" stroke-width="3.6" stroke-linejoin="round"/>
+    <path d="M60 44c18 0 33-8 27-20-6-9-21 1-27 20z" fill="${p.rib}" fill-opacity=".1" stroke="${p.rib}" stroke-width="3.6" stroke-linejoin="round"/>
+    <path d="M60 44C50 40 40 34 38 28M60 44c10-4 20-10 22-16" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M60 46c-5 8-9 14-9 20M60 46c5 8 9 14 9 20" fill="none" stroke="${p.rib}" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="60" cy="44" r="5.5" fill="${p.rib}"/><circle cx="58.5" cy="42.5" r="2" fill="#fff" fill-opacity=".45"/></svg>`;
 }
+/** Monogram: a thin ring around R & C. */
+const monogram = () => `<svg class="mono" viewBox="0 0 64 64" role="img" aria-label="Ribbon & Co."><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="32" cy="32" r="26.5" fill="none" stroke="currentColor" stroke-width=".5" opacity=".6"/>
+  <text x="22" y="39" font-size="22" text-anchor="middle">R</text><text x="43" y="39" font-size="22" text-anchor="middle">C</text><path d="M30 20c2 4 4 4 4 0M30 44c2-4 4-4 4 0" fill="none" stroke="currentColor" stroke-width=".8" opacity=".0"/><path d="M29 32h6" stroke="currentColor" stroke-width="1"/></svg>`;
+/** Shared header for tab pages, so every top-level screen starts the same way. */
+const pagehead = (eyebrow, title, sub) => `<header class="pagehead">${eyebrow ? `<span class="tiny">${eyebrow}</span>` : ''}<h1 class="title">${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}</header>`;
 
 /* ---------- State ---------- */
 const KEY = 'ribbon-demo-v3', ACC_KEY = 'ribbon-accounts-v1';
@@ -324,13 +335,13 @@ function tabbar(active) {
   const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}">${ic(n)}${l}${h === 'account' && unread() ? '<i class="badge-dot" aria-label="Unread letters"></i>' : ''}</a>`;
   return `<nav class="tabs">${t('', 'home', 'Home')}${t('occasions', 'gem', 'Occasions')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
 }
-const STEPS = ['packages', 'customize', 'schedule', 'address', 'review'];
+const STEPS = ['packages', 'customize', 'schedule', 'address', 'review'], STEP_NAMES = ['Package', 'Personalise', 'Schedule', 'Address', 'Review'];
 function flow(step, title, sub, body, cta) {
   const d = draft(), q = quote(d);
   const back = d.resched ? '#/track/' + d.resched : step === 0 ? '#/' : '#/' + STEPS[step - 1];
   return `<div class="screen">
     <div class="topbar"><a class="iconbtn" href="${back}" aria-label="Back">${ic('back')}</a>
-      <div class="grow tiny muted">${d.resched ? 'Reschedule ' + d.resched : `Step ${step + 1} of ${STEPS.length}`}</div>
+      <div class="grow tiny muted">${d.resched ? 'Reschedule ' + d.resched : `Step ${step + 1} of ${STEPS.length} · ${STEP_NAMES[step]}`}</div>
       <a class="iconbtn" href="#/" data-act="exit" aria-label="Close">${ic('close')}</a></div>
     ${d.resched ? '' : `<div class="progress">${STEPS.map((_, i) => `<i class="${i <= step ? 'on' : ''}"></i>`).join('')}</div>`}
     <h1 class="title">${title}</h1><p class="sub">${sub}</p>${body}
@@ -357,17 +368,18 @@ route(/^$/, () => {
   const up = S.bookings.filter(b => b.status !== 'done' && b.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
   const last = S.bookings.filter(b => b.status === 'done').sort((a, b) => b.date.localeCompare(a.date))[0];
   return { tab: '', html: `<div class="screen">
-    <div class="hero ${S.user && S.bookings.length ? 'compact' : ''}"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
-      <h1>The art of<br><em>giving,</em> perfected.</h1>
+    <div class="hero ${S.user && S.bookings.length ? 'compact' : ''}">${monogram()}<div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
+      <h1 class="display">The art of<br><em>giving,</em> perfected.</h1>
       <p class="muted">Camille, our master wrapper, comes to your home or office and dresses every gift as if it were jewellery.</p>
       ${S.user && S.bookings.length ? '' : `<div class="heroart">${gift('ivory')}</div>`}
       <button class="btn" data-act="start">Book an appointment</button>
+      <a class="link quiet" href="#/packages">View the collection</a>
       <p class="tiny muted mt16">Manhattan · Brooklyn · Limited daily availability</p></div>
     ${installCard()}
     ${up ? `<span class="tiny eyebrow">Your next appointment</span><div class="stack mt8">${bookingCard(up)}</div>` : ''}
     ${inviteBanner()}
     ${letterFor()}
-    ${last ? `<div class="sec"><h3>Wrap again</h3></div><div class="stack"><button class="bk" data-act="rebook" data-id="${last.id}">${gift(last.palette)}<div class="grow"><b style="font-family:var(--serif);font-size:22px;font-weight:500">${pkgOf(last.pkg).name}</b>
+    ${last ? `<div class="sec"><h3>Wrap again</h3></div><div class="stack"><button class="bk" data-act="rebook" data-id="${last.id}">${gift(last.palette)}<div class="grow"><b class="ct">${pkgOf(last.pkg).name}</b>
       <div class="muted small">${last.gifts} gifts · ${palOf(last.palette).name} · ${money(last.total)}</div><span class="link">Book the same again</span></div></button></div>` : ''}
     <div class="sec"><h3>The collection</h3><a class="link" href="#/packages">View all</a></div>
     <div class="pkgrow">${PACKAGES.map((p, i) => `<button class="mini" data-act="start" data-pkg="${p.id}">
@@ -389,7 +401,7 @@ route(/^packages$/, () => {
     `<div class="stack">${PACKAGES.map((p, i) => `<div><button class="pkg ${d.pkg === p.id ? 'on' : ''}" data-act="pick-pkg" data-id="${p.id}">
       <div class="art">${gift(PALETTES[[1, 0, 3, 2][i]].id)}</div>
       <span class="badge">${p.badge}</span><div class="row between"><h3>${p.name}</h3><div class="price">${money(p.price)}</div></div>
-      <div class="muted small">${p.incl} gifts included · approx. ${p.mins >= 120 ? p.mins / 60 + ' hours' : p.mins + ' minutes'}${p.wrappers > 1 ? ' · two wrappers' : ''}</div>
+      <div class="meta"><span>${ic('gift')}${p.incl} gifts included</span><span>${ic('clock')}${p.mins >= 120 ? p.mins / 60 + ' hours' : p.mins + ' min'}</span></div>
       <p class="muted small mt8">${p.tag}</p>
       <ul class="feat">${p.feats.map(f => `<li>${ic('check')}${f}</li>`).join('')}</ul></button>
       <div class="center mt8"><button class="link" data-act="pkg-info" data-id="${p.id}">View details &amp; the ritual</button></div></div>`).join('')}</div>`,
@@ -429,7 +441,7 @@ route(/^customize$/, () => {
 function lockedCard() {
   const se = season(), on = (S.waitlist || {}).season;
   return `<div class="pad"><div class="letter"><span class="tiny gold">By invitation</span>
-    <p style="font-size:21px">Camille’s holiday diary opens to returning clients first.</p>
+    <p class="lead">Camille’s holiday diary opens to returning clients first.</p>
     <p class="small muted">It opens to everyone on ${dayLong(se.publicOpens)}. ${S.user ? 'Once you’ve booked with us, you’ll be invited early next season.' : 'Already a client? Sign in to reserve now.'}</p>
     <div class="mt16" style="display:grid;gap:10px">${S.user ? '' : '<button class="btn" data-act="signin">Sign in to reserve</button>'}
       <button class="btn ghost" data-act="season-notify">${on ? 'We’ll write when it opens ✓' : 'Notify me when it opens'}</button></div></div></div>`;
@@ -458,7 +470,7 @@ route(/^season$/, () => {
     <span class="tiny eyebrow">${se.y}</span><h1 class="title" style="padding-top:6px">Reserve Camille<br>before the diary closes.</h1>
     <p class="sub">Every gift is wrapped by hand, by one person. We take a limited number of December appointments, and reserve them in good time.</p>
     <div class="pad"><div class="letter"><span class="tiny gold">The December diary</span>
-      <p style="font-size:34px;margin-top:6px">${st.pct}% reserved</p><div class="bar" style="margin:12px 0"><i style="width:${st.pct}%"></i></div>
+      <p class="stat" style="margin-top:6px">${st.pct}% reserved</p><div class="bar" style="margin:12px 0"><i style="width:${st.pct}%"></i></div>
       <p class="small muted">The week of ${dayShort(se.peakFrom)} to ${dayShort(se.end)} is ${st.peakPct}% reserved.</p></div></div>
     <div class="pad mt16"><div class="card row">${ic(acc === 'open' ? 'sparkle' : acc === 'priority' ? 'gem' : 'clock')}<div class="grow small"><b>${acc === 'priority' ? 'Priority access: you may reserve now' : acc === 'open' ? 'The diary is open to everyone' : 'Opens to everyone on ' + dayShort(se.publicOpens)}</b>
       <div class="muted">${acc === 'priority' ? 'Returning clients and Ribbon Circle members are invited first.' : acc === 'open' ? 'Dates are going quickly. We’d recommend reserving soon.' : 'Returning clients may reserve now. Sign in, or ask to be notified.'}</div></div></div></div>
@@ -488,7 +500,7 @@ route(/^schedule$/, () => {
     ${isSeason(d.date) ? `<p class="small muted pad mb8">${isPeak(d.date) ? '<b class="gold">Peak date · +' + money(PEAK_FEE) + '.</b> ' : ''}Holiday reservations include a ${DEPOSIT_RATE * 100}% deposit${earlyOpen() ? ' and, if you reserve by ' + dayShort(season().earlyBy) + ', complimentary hand-lettered tags' : ''}.</p>` : ''}
     ${seasonLocked(d.date) ? lockedCard() : open ? `<div class="slots">${slots.map(s => `<button class="slot ${d.time === String(s.h) ? 'on' : ''}" ${s.free ? '' : 'disabled'} data-act="slot" data-v="${s.h}">${hourLabel(s.h)}</button>`).join('')}</div>
       ${d.date === todayK ? `<p class="small muted pad mt16">Same-day appointments include a ${money(ASAP_FEE)} priority fee.</p>` : ''}`
-      : `<div class="pad"><div class="card center"><b style="font-family:var(--serif);font-size:21px;font-weight:500">${dayOff(d.date) ? 'Camille is away this day' : 'Camille is fully booked'}</b>
+      : `<div class="pad"><div class="card center"><b class="ct">${dayOff(d.date) ? 'Camille is away this day' : 'Camille is fully booked'}</b>
         <p class="muted small mt8">${dayOff(d.date) ? 'We’re closed on Sundays and occasional private-commission days.' : 'Every appointment is wrapped personally, so we can’t add more on this date.'}</p>
         <div class="mt16" style="display:grid;gap:10px">${nextK ? `<button class="btn" data-act="day" data-v="${nextK}">Next opening · ${dayShort(nextK)}</button>` : ''}
         <button class="btn ghost" data-act="waitlist" data-v="${d.date}">${wl ? 'On the waiting list ✓' : 'Notify me if a time opens'}</button></div></div></div>`}`,
@@ -537,9 +549,9 @@ route(/^review$/, () => {
     <div class="pad">${S.user ? `<div class="card row"><div class="avatar">${initials(S.user.name)}</div><div class="grow"><b>${esc(S.user.name)}</b><div class="muted small">${esc(S.user.email)}</div><div class="muted small">${esc(S.user.phone || S.contact.phone)}</div></div>${ic('check')}</div>` : `
       <div class="actions"><button class="btn ghost sm" data-act="social" data-v="Apple">Continue with Apple</button><button class="btn ghost sm" data-act="social" data-v="Google">Continue with Google</button></div>
       <p class="tiny muted center" style="margin:14px 0">or check out as a guest</p>
-      <div style="display:grid;gap:10px"><label class="field"><span>Full name</span><input data-bind="contact.name" value="${esc(S.contact.name)}" autocomplete="name" placeholder="Josh Walker"></label>
-      <label class="field"><span>Email</span><input data-bind="contact.email" type="email" inputmode="email" autocomplete="email" value="${esc(S.contact.email)}" placeholder="you@example.com"></label>
-      <label class="field"><span>Mobile</span><input data-bind="contact.phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(S.contact.phone)}" placeholder="(212) 555-0142"></label></div>
+      <div style="display:grid;gap:10px"><label class="field"><span>Full name</span><input data-bind="contact.name" value="${esc(S.contact.name)}" autocomplete="name" placeholder="Josh Walker"><em class="hint">Please enter your full name</em></label>
+      <label class="field"><span>Email</span><input data-bind="contact.email" type="email" inputmode="email" autocomplete="email" value="${esc(S.contact.email)}" placeholder="you@example.com"><em class="hint">That email doesn’t look right</em></label>
+      <label class="field"><span>Mobile</span><input data-bind="contact.phone" type="tel" inputmode="tel" autocomplete="tel" value="${esc(S.contact.phone)}" placeholder="(212) 555-0142"><em class="hint">Please include the area code</em></label></div>
       <p class="muted small mt8">Used only for your booking and a text when Camille is on her way. No account needed.</p>`}</div>
     <div class="sec"><h3>Tip your wrapper</h3></div><div class="pad"><div class="tips">${[0, .1, .15, .2].map(t => `<button class="${d.tip === t ? 'on' : ''}" data-act="tip" data-v="${t}">${t ? t * 100 + '%' : 'None'}</button>`).join('')}</div></div>
     <div class="sec"><h3>Payment</h3></div><div class="stack">${[WALLET, ...S.cards].map(p => `<button class="pay ${d.pay === p.id ? 'on' : ''}" data-act="pay" data-id="${p.id}"><span class="cardlogo">${p.logo}</span>
@@ -586,7 +598,7 @@ function occConfirm(b) {
   const o = b.occId && S.occasions.find(x => x.id === b.occId); if (!o) return '';
   const nx = nextOcc(o), yrs = (o.history || []).length;
   return `<div class="letter mt16"><span class="tiny gold">${yrs > 1 ? `Year ${yrs} together` : 'A tradition begins'}</span>
-    <p style="font-size:20px">${yrs > 1 ? `This is your ${ordinal(yrs)} year wrapping ${occTitle(o)} with us. Thank you.` : `We’ll remember ${occTitle(o)}.`}</p>
+    <p class="lead">${yrs > 1 ? `This is your ${ordinal(yrs)} year wrapping ${occTitle(o)} with us. Thank you.` : `We’ll remember ${occTitle(o)}.`}</p>
     <p class="small muted">Next ${dayShort(nx.iso)}${nx.milestone ? `, the ${nx.milestone}` : ''}. Camille will write to you three weeks before.</p></div>`;
 }
 /** Offered once, right after the booking: the details are already known, so it is a single tap. */
@@ -594,7 +606,7 @@ function acctPrompt(b) {
   if (S.user) return `<div class="card row mt16">${ic('check')}<div class="grow small"><b>Saved to your Ribbon Circle account</b><div class="muted">A secure sign-in link was sent to ${esc(S.user.email)}.</div></div></div>`;
   if (b.noAcct) return '';
   return `<div class="card mt16" style="border-color:var(--gold2)"><span class="tiny gold">Ribbon Circle</span>
-    <h3 style="font-size:23px;margin:4px 0 6px">${S.occasions.length ? 'Keep your occasions safe' : 'Book faster next time'}</h3>
+    <h3 class="ct" style="margin:4px 0 6px">${S.occasions.length ? 'Keep your occasions safe' : 'Book faster next time'}</h3>
     <p class="muted small">${S.occasions.length ? 'Create an account so Camille can remember your dates and write to you ahead of each one.' : 'We already have your name, email and address. Keep them, along with this booking, and your next appointment takes seconds.'}</p>
     <button class="btn mt16" data-act="quick-account" data-id="${b.id}">Create my account</button>
     <button class="link mt16" style="display:block;margin:12px auto 0;border:0;color:var(--muted)" data-act="dismiss-acct" data-id="${b.id}">Not now</button>
@@ -610,7 +622,7 @@ route(/^confirmed\/([\w-]+)$/, id => {
     <div class="pad"><div class="appt"><span class="tiny gold">${b.id}</span>
       <div class="when">${dayLong(b.date)}</div>
       <div class="muted">${'Arrival at ' + hourLabel(+b.time)}</div>
-      <div class="hline"></div><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
+      <div class="hline"></div><b class="ct">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div>
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
       <p class="muted small mt16 center">Camille will message you the day before. Free changes up to 24 hours ahead.</p>${occConfirm(b)}${acctPrompt(b)}</div>
@@ -621,7 +633,7 @@ const bookingCard = b => {
   const p = pkgOf(b.pkg);
   const st = b.status === 'cancelled' ? 'Cancelled' : STAGES.find(s => s.id === b.status).long;
   return `<a class="bk" href="#/track/${b.id}">${gift(b.palette)}<div class="grow"><span class="status ${b.status === 'done' ? 'done' : b.status === 'cancelled' ? 'cancelled' : ''}">${st}</span>
-    <div style="font-family:var(--serif);font-size:22px;margin-top:6px">${p.name}</div>
+    <div class="ct" style="margin-top:6px">${p.name}</div>
     <div class="muted small">${dayShort(b.date) + ' · ' + hourLabel(+b.time)}</div>
     <div class="muted small">${esc(b.address.line)}</div></div></a>`;
 };
@@ -630,7 +642,7 @@ route(/^bookings$/, () => {
   const tab = S.bkTab || 'up';
   const list = S.bookings.filter(b => (tab === 'up') === (b.status !== 'done' && b.status !== 'cancelled'))
     .sort((a, b) => tab === 'up' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
-  return { tab: 'bookings', html: `<div class="screen"><h1 class="title" style="padding-top:calc(24px + var(--safe-t))">Your bookings</h1>
+  return { tab: 'bookings', html: `<div class="screen">${pagehead('Appointments', 'Your bookings')}
     <div class="seg"><button class="${tab === 'up' ? 'on' : ''}" data-act="bktab" data-v="up">Upcoming</button><button class="${tab === 'past' ? 'on' : ''}" data-act="bktab" data-v="past">Past</button></div>
     ${!S.user && S.bookings.length ? `<div class="pad mb8"><div class="card row"><div class="grow small"><b>Keep these bookings</b><div class="muted">Create an account to see them on any device.</div></div><button class="btn sm ghost" data-act="signup">Create</button></div></div>` : ''}
     <div class="stack">${list.length ? list.map(bookingCard).join('') : `<div class="empty">${gift('noir')}<p class="mt16">${tab === 'up' ? 'Nothing booked yet.' : 'No past bookings.'}</p>
@@ -642,11 +654,11 @@ route(/^account$/, () => {
     ? [['chat', 'Letters', unread() ? unread() + ' unread' : 'Notes from Camille', 'letters'], ['gem', 'Your occasions', S.occasions.length + ' remembered', 'occasions'], ['share', 'Introductions', S.credit > 0 ? 'Ribbon credit ' + money(S.credit) : 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['pin', 'Saved addresses', S.saved.length + ' places', 'addresses'], ['card', 'Payment methods', S.cards.length + ' on file', 'payments'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help'], ['sparkle', 'Notifications', 'Reminders and receipts', 'prefs']]
     : [['share', 'Introductions', 'Invite a friend, you each receive ' + money(INVITE_CREDIT), 'introductions'], ['gift', 'Gift cards & offers', 'Send a gift card · WRAP10', 'gifting'], ['chat', 'Concierge & help', 'FAQ, policy, contact us', 'help']];
   const list = rows.map(([i, t, s, h]) => `<a class="acct" href="#/${h}">${ic(i)}<span class="grow"><b>${t}</b><span class="muted small" style="display:block">${s}</span></span>${ic('chev')}</a>`).join('');
-  return { tab: 'account', html: `<div class="screen"><div class="pad" style="padding-top:calc(28px + var(--safe-t))">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
-    <div><h2 style="font-size:26px">${esc(u.name)}</h2><div class="muted small">${esc(u.email)}</div></div></div>
+  return { tab: 'account', html: `<div class="screen"><div class="pad ptop">${u ? `<div class="row"><div class="avatar">${initials(u.name)}</div>
+    <div><h2 class="h2">${esc(u.name)}</h2><div class="muted small">${esc(u.email)}</div></div></div>
     <div class="card mt24 row between"><div><div class="tiny gold">Ribbon Circle</div><b>Member since ${new Date(u.since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</b>
       <div class="muted small">${S.bookings.filter(b => b.status === 'done').length} wraps completed${S.credit > 0 ? ' · Ribbon credit ' + money(S.credit) : ''}</div></div>${ic('sparkle')}</div>` :
-    `<span class="tiny gold">Ribbon Circle</span><h1 style="font-size:34px;line-height:1.1;margin:6px 0 10px">Your details,<br>remembered.</h1>
+    `<span class="tiny gold">Ribbon Circle</span><h1 class="title" style="padding:6px 0 10px">Your details,<br>remembered.</h1>
     <p class="muted">You’re browsing as a guest. You never need an account to book, but one makes every visit faster.</p>
     <ul class="checklist mt16"><li>${ic('check')}Rebook a favourite wrap in one tap</li><li>${ic('check')}Saved addresses and payment cards</li><li>${ic('check')}First access to holiday appointments</li></ul>
     <button class="btn mt24" data-act="signup">Create an account</button><button class="btn ghost mt8" data-act="signin">Sign in</button>`}
@@ -671,11 +683,11 @@ function countdown(b) {
 function gratuityBlock(b) {
   if (b.tipAfter < 0) return '';
   return b.tipAfter ? `<div class="pad mt16"><div class="card row">${ic('check')}<div class="grow small"><b>${money(b.tipAfter)} gratuity added</b><div class="muted">Thank you. It goes entirely to Camille.</div></div></div></div>`
-    : `<div class="pad mt16"><div class="card"><b style="font-family:var(--serif);font-size:20px;font-weight:500">Add a gratuity for Camille</b><p class="muted small mt8">Entirely optional, and goes directly to her.</p>
+    : `<div class="pad mt16"><div class="card"><b class="ct">Add a gratuity for Camille</b><p class="muted small mt8">Entirely optional, and goes directly to her.</p>
       <div class="tips mt16">${[10, 20, 40].map(v => `<button data-act="tip-after" data-id="${b.id}" data-v="${v}">${money(v)}</button>`).join('')}<button data-act="tip-after" data-id="${b.id}" data-v="0">Not now</button></div></div></div>`;
 }
 function reviewBlock(b) {
-  return b.review ? `<div class="pad mt16"><div class="card"><div class="tiny muted">Your review</div><p class="mt8" style="font-family:var(--serif);font-size:19px;font-style:italic">“${esc(b.review)}”</p></div></div>`
+  return b.review ? `<div class="pad mt16"><div class="card"><div class="tiny muted">Your review</div><p class="mt8" class="lead" style="font-style:italic">“${esc(b.review)}”</p></div></div>`
     : `<div class="pad mt16"><label class="field"><span>Tell us more (optional)</span><textarea id="rv" rows="3" placeholder="What did you love?"></textarea></label>
       <button class="btn ghost sm mt8" style="width:100%" data-act="review-save" data-id="${b.id}">Send review</button></div>`;
 }
@@ -699,7 +711,7 @@ function bookingView(b) {
       <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div></div>
     ${cancelled ? '' : `<div class="pad mt24"><div class="timeline">${STAGES.map((s, i) => `<div class="tl ${i < idx || b.status === 'done' ? 'done' : i === idx ? 'now' : ''}"><i></i>${s.label}</div>`).join('')}</div></div>`}
     <div class="sec"><h3>${cancelled ? 'Booking cancelled' : 'Your wrapper'}</h3></div>
-    <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${WRAPPER.name}</b>
+    <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b class="ct">${WRAPPER.name}</b>
         <div class="muted small">★ ${WRAPPER.rating} · ${WRAPPER.wraps.toLocaleString()} wraps · ${WRAPPER.bio}</div></div></div>
         <p class="small mt16">${intro[b.status][1]}</p>
         <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`}</div>
@@ -707,14 +719,14 @@ function bookingView(b) {
     ${b.status === 'done' ? gratuityBlock(b) : ''}
     ${b.status === 'done' && b.rating ? reviewBlock(b) + introCard() : ''}
     <div class="sec"><h3>Your order</h3></div>
-    <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
+    <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b class="ct">${p.name}</b>
       <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div></div></div>
       ${addons.length ? `<div class="hline"></div><div class="small">${addons.map(a => `<div class="row between"><span>${a.name}</span><span class="muted">${money(a.price)}</span></div>`).join('')}</div>` : ''}
       ${(b.items || []).length ? `<div class="hline"></div><div class="tiny muted">Your gifts</div><div class="small mt8">${b.items.map(i => `<div class="row between"><span>${esc(i.what || 'Gift')}</span><span class="muted">${i.who ? 'for ' + esc(i.who) : ''}</span></div>`).join('')}</div>` : ''}
       ${(b.photos || []).length ? `<div class="photos mt8">${b.photos.map((p, i) => `<div class="ph"><img src="${p}" alt="Gift photo ${i + 1}"></div>`).join('')}</div>` : ''}
-      ${b.cardmsg ? `<div class="hline"></div><div class="tiny muted">Card message</div><p class="small mt8" style="font-family:var(--serif);font-size:18px;font-style:italic">“${esc(b.cardmsg)}”</p>` : ''}
+      ${b.cardmsg ? `<div class="hline"></div><div class="tiny muted">Card message</div><p class="small mt8" class="lead" style="font-style:italic">“${esc(b.cardmsg)}”</p>` : ''}
       ${b.note ? `<div class="hline"></div><div class="tiny muted">Your note</div><p class="small mt8">${esc(b.note)}</p>` : ''}
-      <div class="hline"></div><div class="row between"><span>Total</span><b style="font-family:var(--serif);font-size:22px;font-weight:500">${money(b.total)}</b></div></div></div>
+      <div class="hline"></div><div class="row between"><span>Total</span><b class="ct">${money(b.total)}</b></div></div></div>
     ${cancelled || b.status === 'done' ? '' : `<div class="sec"><h3>Before we arrive</h3></div><div class="pad"><ul class="checklist">
       <li>${ic('check')}Gather your gifts in one room, with any boxes or bags to be reused.</li>
       <li>${ic('check')}Set aside a clear table or surface about 1.5 m wide.</li>
@@ -738,7 +750,7 @@ route(/^receipt\/([\w-]+)$/, id => {
   return { html: `<div class="screen" style="padding-bottom:40px"><div class="topbar noprint"><a class="iconbtn" href="#/track/${b.id}" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Receipt</div></div>
     <div class="pad"><div class="receipt"><div class="center"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div></div><div class="hline"></div>
       <div class="row between small"><span class="muted">Receipt</span><b>${b.id}</b></div>
-      <div class="row between small"><span class="muted">Date of service</span><span>${dayLong(b.date)}, ${hourLabel(+b.time)}</span></div>
+      <div class="row between small"><span class="muted">Date of service</span><span>${dayShort(b.date)}, ${hourLabel(+b.time)}</span></div>
       <div class="row between small"><span class="muted">Billed to</span><span>${esc(c.name || '')}</span></div>
       <div class="row between small"><span class="muted">Location</span><span style="text-align:right;max-width:60%">${esc(b.address.line)}</span></div>
       <div class="row between small"><span class="muted">Paid with</span><span>${esc(([WALLET, ...PAYMENTS, ...S.cards].find(x => x.id === b.pay) || WALLET).name)}</span></div>
@@ -809,9 +821,7 @@ function occCard(o) {
 }
 route(/^occasions$/, () => {
   const list = S.occasions.map(o => [o, nextOcc(o)]).sort((a, b) => a[1].days - b[1].days);
-  return { tab: 'occasions', html: `<div class="screen"><span class="tiny eyebrow" style="padding-top:calc(30px + var(--safe-t))">Remembered</span>
-    <h1 class="title" style="padding-top:6px">Your occasions</h1>
-    <p class="sub">The dates that matter, kept for you. Three weeks ahead, Camille will write so your appointment is secured in good time.</p>
+  return { tab: 'occasions', html: `<div class="screen">${pagehead('Remembered', 'Your occasions', 'The dates that matter, kept for you. Three weeks ahead, Camille will write so your appointment is secured in good time.')}
     ${list.length ? `<div class="stack">${list.map(([o]) => occCard(o)).join('')}</div>` : `<div class="empty" style="padding-top:20px">${gift('ivory')}<p class="mt16">No occasions yet.<br>Tell us a date that matters and we’ll remember it every year.</p></div>`}
     <div class="pad mt16"><button class="btn ghost" data-act="occ-add">${ic('plus')} Remember a new occasion</button></div>
     <div class="sec"><h3>The season of giving</h3></div>
@@ -835,7 +845,7 @@ function traditionBlock(d) {
   }
   if (!ANNUAL.includes(d.occasion)) return '';
   return `<div class="pad mt16"><div class="card" style="${d.remember ? 'border-color:var(--ink)' : ''}"><button class="row" style="width:100%;text-align:left" data-act="remember-toggle"><span class="check ${d.remember ? 'on' : ''}">${ic('check')}</span>
-    <span class="grow"><b style="font-family:var(--serif);font-size:19px;font-weight:500">Make it a tradition</b><span class="muted small" style="display:block">We’ll remember this ${d.occasion.toLowerCase()} and write to you three weeks ahead each year.</span></span></button>
+    <span class="grow"><b class="ct">Make it a tradition</b><span class="muted small" style="display:block">We’ll remember this ${d.occasion.toLowerCase()} and write to you three weeks ahead each year.</span></span></button>
     ${d.remember ? `<div style="display:grid;gap:10px;margin-top:14px"><label class="field"><span>${d.occasion === 'Birthday' ? 'Whose birthday?' : 'Whose anniversary?'}</span><input data-bind="remWho" value="${esc(d.remWho)}" placeholder="${d.occasion === 'Birthday' ? 'Mum' : 'Sarah & James'}"></label>
       <label class="field"><span>Date (add the original year for milestones)</span><input type="date" data-bind="remDate" value="${esc(d.remDate)}"></label></div>` : ''}</div></div>`;
 }
@@ -861,7 +871,7 @@ function inviteCard(code, from) {
 /** Shown to a new client who arrived through an invitation. */
 function inviteBanner() {
   const i = S.invite; if (!i || i.used || S.bookings.length) return '';
-  return `<div class="pad mt24"><div class="letter"><span class="tiny gold">An invitation</span><p style="font-size:22px">${esc(i.from)} has invited you to Ribbon &amp; Co.</p>
+  return `<div class="pad mt24"><div class="letter"><span class="tiny gold">An invitation</span><p class="lead">${esc(i.from)} has invited you to Ribbon &amp; Co.</p>
     <p class="small muted">${money(INVITE_CREDIT)} is waiting for your first appointment with Camille. It will be applied at checkout.</p><button class="btn mt16" data-act="start">Reserve Camille</button></div></div>`;
 }
 const introCard = () => `<div class="pad mt16"><a class="card row" href="#/introductions" style="border-color:var(--gold2)">${ic('share')}<div class="grow small"><b>Introduce a friend</b><div class="muted">You each receive ${money(INVITE_CREDIT)} towards a Ribbon &amp; Co. appointment.</div></div>${ic('chev')}</a></div>`;
@@ -878,7 +888,7 @@ route(/^introductions$/, () => {
         <button class="previewlink" data-act="ref-demo">Demo: simulate a friend’s progress ›</button></div>
       <div class="sec"><h3>The Circle</h3></div><div class="pad">${tiers.map(([n, t]) => `<div class="kv">${ic(done >= n ? 'check' : 'gem')}<div class="grow"><b>${n === 1 ? 'First introduction' : n + ' introductions'}</b><div class="muted small">${t}</div></div><span class="small ${done >= n ? 'muted' : 'gold'}">${done >= n ? 'Unlocked' : Math.min(done, n) + '/' + n}</span></div>`).join('')}</div>
       <p class="muted small pad mt24">Credit is added when your guest’s first appointment is complete, and is applied automatically to your next booking. Invitations are for new clients only.</p>`
-    : `<div class="pad"><div class="letter"><span class="tiny gold">Ribbon Circle</span><p style="font-size:22px">Every member holds a private invitation.</p>
+    : `<div class="pad"><div class="letter"><span class="tiny gold">Ribbon Circle</span><p class="lead">Every member holds a private invitation.</p>
       <p class="small muted">Create your account to receive your personal invitation and ${money(INVITE_CREDIT)} for each friend you introduce.</p>
       <button class="btn mt16" data-act="signup">Create an account</button><button class="btn ghost mt8" data-act="signin">Sign in</button></div></div>
       <p class="center mt16"><a class="link" data-act="invite-preview">See what your friend would receive</a></p>`);
@@ -908,7 +918,7 @@ route(/^payments$/, () => sub('Payment methods', 'Your card is only charged once
   <div class="pad mt24"><button class="btn ghost" data-act="card-add">Add a card</button></div>`));
 
 route(/^gifting$/, () => sub('Gift cards &amp; offers', 'Give the gift of beautiful wrapping, or use an offer on your next booking.',
-  `<div class="sec" style="padding-top:6px"><h3>Offers</h3></div><div class="stack">${Object.entries(PROMOS).map(([c, r]) => `<div class="card row"><div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${r * 100}% off</b>
+  `<div class="sec" style="padding-top:6px"><h3>Offers</h3></div><div class="stack">${Object.entries(PROMOS).map(([c, r]) => `<div class="card row"><div class="grow"><b class="ct">${r * 100}% off</b>
     <div class="muted small">Code <b>${c}</b> · ${c === 'WELCOME15' ? 'New clients' : 'Any package'}</div></div><button class="btn sm ghost" data-act="use-promo" data-v="${c}">Use</button></div>`).join('')}</div>
   <div class="sec"><h3>Send a gift card</h3></div>
   <div class="chips" id="amts">${[100, 250, 500, 1000].map(a => `<button class="chip ${a === 250 ? 'on' : ''}" data-act="gc-amt" data-v="${a}">${money(a)}</button>`).join('')}</div>
@@ -928,6 +938,7 @@ route(/^prefs$/, () => sub('Notifications', 'Choose how we keep you informed.',
 
 /* ---------- Router ---------- */
 let current = '';
+const TABS = ['', 'occasions', 'bookings', 'account'], hist = [], tabScroll = {};
 function render() {
   const h = location.hash.replace(/^#\/?/, '');
   for (const [re, fn] of routes) {
@@ -935,21 +946,44 @@ function render() {
     const r = fn(...m.slice(1));
     if (r.redirect) { location.replace(r.redirect); return; }
     const app = $('#app');
-    const keepScroll = h === current;
-    const top = app.scrollTop;
+    const same = h === current, top = app.scrollTop;
+    if (!same && TABS.includes(current)) tabScroll[current] = top;
+    let dir = null;
+    if (!same) {
+      if (hist.length > 1 && hist[hist.length - 2] === h) { hist.pop(); dir = 'back'; }
+      else { dir = TABS.includes(h) && TABS.includes(current) ? 'fade' : 'fwd'; hist.push(h); if (hist.length > 60) hist.shift(); }
+    }
     app.innerHTML = r.html;
-    if (!keepScroll) { app.style.animation = 'none'; app.offsetHeight; app.style.animation = ''; }
-    app.scrollTop = keepScroll ? top : 0;
+    app.className = '';
+    if (dir) { app.offsetHeight; app.className = 'nav-' + dir; }
+    app.scrollTop = same ? top : (TABS.includes(h) && dir === 'back' ? tabScroll[h] || 0 : 0);
     current = h;
     if (r.mount) r.mount();
     return;
   }
   location.replace('#/');
 }
+$('#app').addEventListener('scroll', e => { const t = e.target.querySelector('.topbar'); t && t.classList.toggle('scrolled', e.target.scrollTop > 6); }, { passive: true });
 window.addEventListener('hashchange', () => { closeSheet(); render(); });
 
 /* ---------- Actions ---------- */
 const bind = (path, v) => { const parts = path.split('.'); let o = parts[0] === 'contact' ? S : draft(); while (parts.length > 1) o = o[parts.shift()] ||= {}; o[parts[0]] = v; save(); };
+/** Completes a booking once the short "securing the diary" moment has passed. */
+function finishBooking() {
+    const d = draft(), q = quote(d);
+    const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
+      contact: { ...S.contact }, q: (({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total }) => ({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total, promo: d.promo }))(q), deposit: depositOf(d, q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
+    const snap = { date: b.date, pkg: b.pkg, gifts: b.gifts, palette: b.palette, addons: b.addons, items: b.items, address: b.address, total: b.total };
+    let o = d.occId && S.occasions.find(x => x.id === d.occId);
+    if (o) (o.history ||= []).push(snap);
+    else if (d.remember && d.remDate && (d.remWho.trim() || d.occasion !== 'Birthday')) { o = { id: 'o' + Date.now(), kind: d.occasion, who: d.remWho.trim(), date: d.remDate, history: [snap] }; S.occasions.push(o); }
+    if (o) b.occId = o.id;
+    if (q.invite) S.invite.used = true;
+    if (q.credit) S.credit = Math.round((S.credit - q.credit) * 100) / 100;
+    addLetter('booking', 'Your appointment is reserved', `${pkgOf(b.pkg).name} on ${dayLong(b.date)} at ${hourLabel(+b.time)}. Camille will write to you the day before.`, '#/track/' + b.id);
+    S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
+    location.hash = '#/confirmed/' + b.id;
+}
 let pend = {};
 function authSheet(mode) {
   const up = mode === 'signup';
@@ -989,21 +1023,10 @@ const actions = {
     draft().promo = amt ? '' : v; save(); render();
     if (amt) { toast(`${money(amt)} gift card added to your Ribbon credit`); }
   },
-  book() {
-    if (!contactOk()) return;
-    const d = draft(), q = quote(d);
-    const b = { id: 'GW-' + String(Math.floor(10000 + Math.random() * 89999)), pkg: d.pkg, gifts: d.gifts, palette: d.palette, occasion: d.occasion, addons: d.addons.slice(),
-      contact: { ...S.contact }, q: (({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total }) => ({ extra, addons, asap, peak, discount, perk, early, invite, inviteFrom, credit, fee, tax, tip, total, promo: d.promo }))(q), deposit: depositOf(d, q), items: d.items.filter(i => i.who || i.what), photos: d.photos.slice(), note: d.note, cardmsg: d.addons.includes('card') ? d.cardmsg : '', date: d.date, time: d.time, mins: durMins(d), address: { ...d.address }, total: q.total, status: 'confirmed', createdAt: Date.now(), pay: d.pay };
-    const snap = { date: b.date, pkg: b.pkg, gifts: b.gifts, palette: b.palette, addons: b.addons, items: b.items, address: b.address, total: b.total };
-    let o = d.occId && S.occasions.find(x => x.id === d.occId);
-    if (o) (o.history ||= []).push(snap);
-    else if (d.remember && d.remDate && (d.remWho.trim() || d.occasion !== 'Birthday')) { o = { id: 'o' + Date.now(), kind: d.occasion, who: d.remWho.trim(), date: d.remDate, history: [snap] }; S.occasions.push(o); }
-    if (o) b.occId = o.id;
-    if (q.invite) S.invite.used = true;
-    if (q.credit) S.credit = Math.round((S.credit - q.credit) * 100) / 100;
-    addLetter('booking', 'Your appointment is reserved', `${pkgOf(b.pkg).name} on ${dayLong(b.date)} at ${hourLabel(+b.time)}. Camille will write to you the day before.`, '#/track/' + b.id);
-    S.bookings.unshift(b); S.draft = null; S.bkTab = 'up'; if (S.user) { S.user.phone ||= S.contact.phone; } save();
-    location.hash = '#/confirmed/' + b.id;
+  book(el) {
+    if (!contactOk() || el.classList.contains('busy')) return;
+    el.classList.add('busy'); el.setAttribute('aria-busy', 'true');
+    setTimeout(finishBooking, 950);
   },
   bktab(el) { S.bkTab = el.dataset.v; save(); render(); },
   advance(el) {
@@ -1048,11 +1071,11 @@ const actions = {
     const p = pkgOf(el.dataset.id), i = PACKAGES.indexOf(p);
     openSheet(`<div class="center">${gift(PALETTES[[1, 0, 3, 2][i]].id, 90)}<span class="tiny gold" style="display:block">${p.badge}</span><h3>${p.name}</h3>
       <p class="muted small">${p.tag}</p></div><div class="hline"></div>
-      <div class="row between"><span>From</span><b style="font-family:var(--serif);font-size:22px;font-weight:500">${money(p.price)}</b></div>
+      <div class="row between"><span>From</span><b class="ct">${money(p.price)}</b></div>
       <div class="row between small muted"><span>${p.incl} gifts included</span><span>then ${money(p.extra)} each</span></div>
       <div class="row between small muted"><span>Approx. time</span><span>${p.mins >= 120 ? p.mins / 60 + ' hours' : p.mins + ' minutes'}${p.wrappers > 1 ? ' · two wrappers' : ''}</span></div>
       <div class="hline"></div><ul class="feat" style="border:0;margin:0;padding:0">${p.feats.map(f => `<li>${ic('check')}${f}</li>`).join('')}</ul>
-      <div class="sec" style="padding:22px 0 6px"><h3 style="font-size:20px">The ritual</h3></div>
+      <div class="sec" style="padding:22px 0 6px"><h3 class="ct">The ritual</h3></div>
       <div class="how" style="padding:0">${RITUAL.map(([t, d], n) => `<div style="padding:12px 0"><i style="font-size:22px">${n + 1}</i><span><b style="font-size:17px">${t}</b><span class="muted small">${d}</span></span></div>`).join('')}</div>
       <button class="btn mt16" data-act="pick-close" data-id="${p.id}">Select ${p.name}</button>`);
   },
@@ -1236,9 +1259,14 @@ document.addEventListener('change', e => {
   img.onerror = () => { URL.revokeObjectURL(url); toast('That image couldn’t be read'); };
   img.src = url;
 });
+document.addEventListener('focusout', e => {
+  const k = e.target.dataset && e.target.dataset.bind; if (!k || !k.startsWith('contact.')) return;
+  const v = e.target.value, ok = k === 'contact.name' ? v.trim().length >= 2 : k === 'contact.email' ? validEmail(v) : v.replace(/\D/g, '').length >= 10;
+  e.target.closest('.field').classList.toggle('bad', !!v && !ok);
+});
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.bind; if (!k) return;
-  bind(k, e.target.value);
+  bind(k, e.target.value); if (k.startsWith('contact.')) e.target.closest('.field').classList.remove('bad');
   const btn = $('#bookbtn'); if (btn) { const ok = contactOk(); btn.disabled = !ok; btn.textContent = ok ? bookLabel(draft()) : 'Add your details to book'; }
 });
 
