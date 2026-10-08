@@ -50,3 +50,12 @@ Camille is the only wrapper, so the calendar is a single shared resource:
 - **Booking page**: countdown ("Tomorrow", "In 3 days"), Share (Web Share, falling back to copy), written review after rating.
 - **Receipts**: itemised, printable / save-as-PDF.
 - **Install prompt**: native install button on Chromium, "Add to Home Screen" hint on iOS Safari; dismissible.
+
+## Occasions: remembered annual dates
+The retention loop, written in a jeweller's voice rather than a discount-code one.
+- **Make it a tradition** (customize step, for Birthday / Anniversary / Wedding): add a name and date and the app remembers it every year. Works for guests too; occasions move into the account when one is created.
+- **A note from Camille**: three weeks before a remembered date, Home leads with a personal letter: the date, any milestone (70th birthday, Silver/Pearl/Ruby anniversary when the original year is known), what was wrapped last time, and live availability from Camille's calendar before the day. "Remind me later" snoozes it a week.
+- **Occasions tab**: every remembered date, countdown, last wrap, Reserve / Edit / Remove; add dates any time.
+- **Reserve in one tap**: pre-fills last year's package, palette, gifts, address and finishing touches, picks the first open date before the occasion, suggests something new, and includes a **complimentary monogram wax seal** for returning traditions.
+- **Confirmation** celebrates the tradition ("Year 2 together"); receipts itemise the complimentary seal. Reminders can be switched off under Notifications.
+- Demo account has three sample occasions dated relative to today (Mum's 70th in 12 days, a Silver anniversary, Eleanor's birthday).
