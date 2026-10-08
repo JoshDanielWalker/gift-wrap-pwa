@@ -48,12 +48,10 @@ const PAYMENTS = [
 ];
 const WRAPPER = { name: 'Camille Laurent', rating: 4.98, wraps: 1240, car: 'Black Tesla Model Y · LUX 482', bio: 'Trained in Paris. Loves a perfect corner.' };
 const STAGES = [
-  { id: 'confirmed', label: 'Booking confirmed' },
-  { id: 'assigned', label: 'Wrapper assigned' },
-  { id: 'enroute', label: 'On the way' },
-  { id: 'arrived', label: 'Arrived' },
-  { id: 'wrapping', label: 'Wrapping your gifts' },
-  { id: 'done', label: 'Complete' },
+  { id: 'confirmed', label: 'Confirmed', long: 'Confirmed' },
+  { id: 'assigned', label: 'Wrapper assigned', long: 'Wrapper assigned' },
+  { id: 'today', label: 'Day of service', long: 'Wrapper on the way' },
+  { id: 'done', label: 'Complete', long: 'Completed' },
 ];
 const PROMOS = { WRAP10: 0.1, WELCOME15: 0.15 };
 const TAX = 0.08875, SERVICE_FEE = 6, ASAP_FEE = 15;
@@ -93,7 +91,7 @@ const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hid
 function gift(palId, size) {
   const p = palOf(palId);
   return `<svg class="gift" viewBox="0 0 120 120" ${size ? `width="${size}" height="${size}"` : ''} aria-hidden="true">
-    <ellipse cx="60" cy="108" rx="40" ry="5" fill="#000" opacity=".35"/>
+    <ellipse cx="60" cy="108" rx="40" ry="5" fill="#000" opacity=".12"/>
     <rect x="18" y="56" width="84" height="48" rx="4" fill="${p.paper}" stroke="${p.rib}" stroke-opacity=".5"/>
     <rect x="12" y="42" width="96" height="20" rx="4" fill="${p.paper}" stroke="${p.rib}" stroke-opacity=".7"/>
     <rect x="53" y="42" width="14" height="62" fill="${p.rib}"/><rect x="12" y="48" width="96" height="6" fill="${p.rib}" opacity=".0"/>
@@ -102,7 +100,7 @@ function gift(palId, size) {
 }
 
 /* ---------- State ---------- */
-const KEY = 'ribbon-demo-v1';
+const KEY = 'ribbon-demo-v2';
 function seed() {
   const d = new Date(); d.setDate(d.getDate() - 21);
   const d2 = new Date(); d2.setDate(d2.getDate() - 70);
@@ -116,7 +114,7 @@ function seed() {
       mk('GW-48211', 'signature', 4, 'ivory', d, '14', { ...SAVED[0] }, 124.4),
       mk('GW-39027', 'classic', 3, 'noir', d2, '11', { ...SAVED[1] }, 71.8),
     ],
-    sim: {},
+    
   };
 }
 let S;
@@ -201,32 +199,34 @@ const route = (re, fn) => routes.push([re, fn]);
 
 route(/^$/, () => {
   const up = S.bookings.filter(b => b.status !== 'done' && b.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
-  const hr = new Date().getHours();
-  const hello = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   return { tab: '', html: `<div class="screen">
-    <div class="hero"><div class="brand">Ribbon &amp; Co.</div>
-      <h1>Beautifully wrapped,<br><em>at your door.</em></h1>
-      <p class="muted small">${hello}, Josh. A master wrapper, anywhere in Manhattan &amp; Brooklyn.</p>
-      <button class="where" data-act="start"><span class="dot"></span><span class="grow"><span class="tiny muted" style="display:block">Wrap at</span>
-        ${esc((S.draft && S.draft.address?.line) || SAVED[0].line)}</span>${ic('chev')}</button>
-      <button class="btn mt16" data-act="start">Book a wrapper</button></div>
-    ${up ? `<div class="sec"><h3>Upcoming</h3></div><div class="stack">${bookingCard(up)}</div>` : ''}
-    <div class="sec"><h3>Packages</h3><a href="#/packages">See all</a></div>
+    <div class="hero"><div class="brand">Ribbon &amp; Co.<small>GIFT WRAPPING ATELIER</small></div>
+      <h1>The art of<br><em>giving,</em> perfected.</h1>
+      <p class="muted">Our master wrappers come to your home or office and dress every gift as if it were jewellery.</p>
+      <div class="heroart">${gift('ivory')}</div>
+      <button class="btn" data-act="start">Book an appointment</button>
+      <p class="tiny muted mt16">Manhattan · Brooklyn · Same-day available</p></div>
+    ${up ? `<span class="tiny eyebrow">Your next appointment</span><div class="stack mt8">${bookingCard(up)}</div>` : ''}
+    <div class="sec"><h3>The collection</h3><a class="link" href="#/packages">View all</a></div>
     <div class="pkgrow">${PACKAGES.map((p, i) => `<button class="mini" data-act="start" data-pkg="${p.id}">
-      ${gift(PALETTES[i % PALETTES.length].id)}<b>${p.name}</b><span class="muted small">From ${money(p.price)} · ${p.incl} gifts</span></button>`).join('')}</div>
-    <div class="sec"><h3>The Ribbon promise</h3></div>
+      ${gift(PALETTES[[1, 0, 3, 2][i]].id)}<b>${p.name}</b><span class="muted small">From ${money(p.price)}</span></button>`).join('')}</div>
+    <div class="sec"><h3>How it works</h3></div>
+    <div class="how"><div><i>I</i><span><b>Select your package</b><span class="muted small">Choose a finish, your palette and any finishing touches.</span></span></div>
+      <div><i>II</i><span><b>Reserve your time</b><span class="muted small">Pick a day and arrival time, share where we should come.</span></span></div>
+      <div><i>III</i><span><b>We arrive, you relax</b><span class="muted small">Your wrapper brings every material and leaves nothing behind.</span></span></div></div>
+    <div class="sec"><h3>Our promise</h3></div>
     <div class="perks"><div>${ic('sparkle')}<br>Master wrappers</div><div>${ic('bolt')}<br>Same-day available</div><div>${ic('shield')}<br>Insured &amp; vetted</div></div>
-    <div class="sec"></div><p class="quote">“I handed over a pile of boxes and an hour later it looked like a boutique window.”<br><span class="small muted" style="font-style:normal">— Eleanor, Upper West Side</span></p>
+    <div class="sec"></div><p class="quote">“I handed over a pile of boxes and an hour later it looked like a boutique window.”<span>Eleanor · Upper West Side</span></p>
   </div>${tabbar('')}` };
 });
 
 route(/^packages$/, () => {
   const d = draft();
-  return { html: flow(0, 'Choose your<br>wrapping package', 'Every package includes materials, a professional wrapper and cleanup.',
+  return { html: flow(0, 'Select your<br>package', 'Every package includes materials, a professional wrapper and cleanup.',
     `<div class="stack">${PACKAGES.map((p, i) => `<button class="pkg ${d.pkg === p.id ? 'on' : ''}" data-act="pick-pkg" data-id="${p.id}">
-      <div class="top">${gift(d.palette === 'noir' ? PALETTES[i + 1 > 4 ? 0 : i].id : d.palette)}
-      <div class="grow"><span class="badge">${p.badge}</span><h3>${p.name}</h3>
-      <div class="price">${money(p.price)}</div><div class="muted small">${p.incl} gifts included · ~${p.mins >= 120 ? p.mins / 60 + ' hrs' : p.mins + ' min'}${p.wrappers > 1 ? ' · 2 wrappers' : ''}</div></div></div>
+      <div class="art">${gift(PALETTES[[1, 0, 3, 2][i]].id)}</div>
+      <span class="badge">${p.badge}</span><div class="row between"><h3>${p.name}</h3><div class="price">${money(p.price)}</div></div>
+      <div class="muted small">${p.incl} gifts included · approx. ${p.mins >= 120 ? p.mins / 60 + ' hours' : p.mins + ' minutes'}${p.wrappers > 1 ? ' · two wrappers' : ''}</div>
       <p class="muted small mt8">${p.tag}</p>
       <ul class="feat">${p.feats.map(f => `<li>${ic('check')}${f}</li>`).join('')}</ul></button>`).join('')}</div>`,
     `<a class="btn" href="#/customize">Continue with ${pkgOf(d.pkg).name}</a>`) };
@@ -273,8 +273,7 @@ route(/^address$/, () => {
     <div class="pad"><button class="sugg" data-act="locate"><span class="pin">${ic('pin')}</span><span class="grow"><b>Use current location</b><span class="muted small" style="display:block">Demo: uses a sample address</span></span></button></div>
     <div class="sec"><h3>Saved places</h3></div><div class="pad">${SAVED.map((s, i) => `<button class="sugg ${a && a.line === s.line ? 'on' : ''}" data-act="saved" data-i="${i}">
       <span class="pin">${ic(i ? 'cal' : 'home')}</span><span class="grow"><b>${s.label}</b><span class="muted small" style="display:block">${s.line}</span></span></button>`).join('')}</div>
-    ${a ? `<div class="sec"><h3>Details</h3></div><div class="minimap">${miniMap()}</div>
-      <div class="stack mt16"><div class="card row">${ic('pin')}<div class="grow"><b>${esc(a.label || 'Selected address')}</b><div class="muted small">${esc(a.line)}</div></div></div>
+    ${a ? `<div class="sec"><h3>Details</h3></div><div class="stack"><div class="card row">${ic('pin')}<div class="grow"><b>${esc(a.label || 'Selected address')}</b><div class="muted small">${esc(a.line)}</div><div class="okline mt8">${ic('check')} Within our service area</div></div></div>
       <label class="field"><span>Apt / suite / floor</span><input data-bind="address.unit" value="${esc(a.unit || '')}" placeholder="Apt 5B"></label>
       <label class="field"><span>Access instructions</span><textarea rows="2" data-bind="address.notes" placeholder="Doorman, buzzer code, parking…">${esc(a.notes || '')}</textarea></label>
       <label class="field"><span>Contact phone</span><input data-bind="address.phone" inputmode="tel" value="${esc(a.phone ?? '(212) 555-0142')}"></label></div>` : ''}`,
@@ -289,13 +288,6 @@ route(/^address$/, () => {
       });
     } };
 });
-
-function miniMap() {
-  return `<svg viewBox="0 0 400 140" preserveAspectRatio="xMidYMid slice"><rect width="400" height="140" fill="#101012"/>
-    ${[0, 1, 2, 3, 4, 5, 6].map(i => `<path d="M${i * 70 - 20} 0V140" stroke="#222226" stroke-width="10"/>`).join('')}
-    ${[0, 1, 2].map(i => `<path d="M0 ${i * 55 + 15}H400" stroke="#222226" stroke-width="10"/>`).join('')}
-    <circle cx="200" cy="70" r="22" fill="#c9a45c" opacity=".18"/><circle cx="200" cy="70" r="8" fill="#c9a45c"/></svg>`;
-}
 
 route(/^review$/, () => {
   const d = draft(), q = quote(d);
@@ -333,24 +325,25 @@ route(/^confirmed\/([\w-]+)$/, id => {
   const b = S.bookings.find(x => x.id === id);
   if (!b) return { redirect: '#/bookings' };
   const p = pkgOf(b.pkg);
-  const bits = Array.from({ length: 26 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 9) * .15}s;background:${['#c9a45c', '#e6c98a', '#f4efe6', '#b9786b'][i % 4]}"></i>`).join('');
-  return { html: `<div class="screen"><div class="confetti">${bits}</div>
+  return { html: `<div class="screen">
     <div class="seal"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-    <h1 class="title center">You’re booked.</h1><p class="sub center">A confirmation has been sent to josh.d.walker@me.com</p>
-    <div class="pad"><div class="card"><div class="row"><div class="grow"><div class="tiny muted">Booking</div><b>${b.id}</b></div><span class="status">Confirmed</span></div>
-      <div class="hline"></div>
-      <div class="kv">${ic('gift')}<div><b>${p.name}</b><div class="muted small">${b.gifts} gifts · ${esc(b.occasion)}</div></div></div>
-      <div class="kv">${ic('cal')}<div><b>${b.time === 'asap' ? 'As soon as possible' : dayLong(b.date)}</b><div class="muted small">${b.time === 'asap' ? 'Arrives in ~60 min' : 'Arrives ' + hourLabel(+b.time)}</div></div></div>
-      <div class="kv">${ic('pin')}<div><b>${esc(b.address.line)}</b><div class="muted small">${esc(b.address.unit || '')}</div></div></div></div>
-      <p class="muted small mt16 center">Your wrapper is assigned shortly before arrival, and you’ll be notified.</p></div>
-    <div class="cta"><a class="btn" href="#/track/${b.id}">Track my wrapper</a><div class="actions mt8"><button class="btn ghost" data-act="ics" data-id="${b.id}">${ic('cal')} Add to calendar</button><a class="btn ghost" href="#/">Done</a></div></div></div>` };
+    <h1 class="title center">Your appointment<br>is reserved.</h1><p class="sub center">A confirmation is on its way to josh.d.walker@me.com</p>
+    <div class="pad"><div class="appt"><span class="tiny gold">${b.id}</span>
+      <div class="when">${b.time === 'asap' ? 'Today, as soon as possible' : dayLong(b.date)}</div>
+      <div class="muted">${b.time === 'asap' ? 'Arrival in approximately 60 minutes' : 'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="hline"></div><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
+      <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div>
+      <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div>
+      <p class="muted small mt16 center">Your wrapper is introduced to you the day before. Free changes up to 24 hours ahead.</p></div>
+    <div class="cta"><a class="btn" href="#/track/${b.id}">View booking</a><div class="actions mt8"><button class="btn ghost" data-act="ics" data-id="${b.id}">Add to calendar</button><a class="btn ghost" href="#/">Done</a></div></div></div>` };
 });
 
 const bookingCard = b => {
   const p = pkgOf(b.pkg);
-  return `<a class="bk" href="#/track/${b.id}" style="text-decoration:none;color:inherit">${gift(b.palette)}<div class="grow"><div class="row between"><b style="font-family:var(--serif);font-size:18px;font-weight:500">${p.name}</b>
-    <span class="status ${b.status === 'done' ? 'done' : b.status === 'cancelled' ? 'cancelled' : ''}">${b.status === 'done' ? 'Completed' : b.status === 'cancelled' ? 'Cancelled' : STAGES.find(s => s.id === b.status).label}</span></div>
-    <div class="muted small mt8">${b.time === 'asap' ? 'Today · ASAP' : dayShort(b.date) + ' · ' + hourLabel(+b.time)}</div>
+  const st = b.status === 'cancelled' ? 'Cancelled' : STAGES.find(s => s.id === b.status).long;
+  return `<a class="bk" href="#/track/${b.id}">${gift(b.palette)}<div class="grow"><span class="status ${b.status === 'done' ? 'done' : b.status === 'cancelled' ? 'cancelled' : ''}">${st}</span>
+    <div style="font-family:var(--serif);font-size:22px;margin-top:6px">${p.name}</div>
+    <div class="muted small">${b.time === 'asap' ? 'Today · as soon as possible' : dayShort(b.date) + ' · ' + hourLabel(+b.time)}</div>
     <div class="muted small">${esc(b.address.line)}</div></div></a>`;
 };
 
@@ -372,104 +365,62 @@ route(/^account$/, () => ({ tab: 'account', html: `<div class="screen"><div clas
   <button class="acct" data-act="reset">${ic('reset')}<span class="grow"><b>Reset demo data</b><span class="muted small" style="display:block">Clear bookings and start fresh</span></span></button></div>
   <p class="muted small center mt24">Ribbon &amp; Co. demo · all data is mocked</p></div></div>${tabbar('account')}` }));
 
-/* ---------- Tracking ---------- */
-const ROUTE_D = 'M50 320 V250 H170 V160 H290 V90 H330';
-function trackView(b) {
-  const p = pkgOf(b.pkg), idx = STAGES.findIndex(s => s.id === b.status);
-  const cancelled = b.status === 'cancelled';
-  const head = {
-    confirmed: ['Booking confirmed', 'A wrapper is assigned shortly before your appointment.'],
-    assigned: [`${WRAPPER.name.split(' ')[0]} is your wrapper`, 'She’ll head your way shortly.'],
-    enroute: [`${WRAPPER.name.split(' ')[0]} is on her way`, ''],
-    arrived: [`${WRAPPER.name.split(' ')[0]} has arrived`, 'Please welcome your wrapper at the door.'],
-    wrapping: ['Wrapping in progress', 'Sit back — the magic is happening.'],
-    done: ['All wrapped!', 'We hope they love it.'],
-    cancelled: ['Booking cancelled', 'No charge was made.'],
-  }[b.status];
-  const wrapperShown = idx >= 1 && !cancelled;
-  const inprog = b.status === 'wrapping';
-  const gifts = Array.from({ length: Math.min(b.gifts, 14) }, (_, i) => gift(b.palette).replace('<svg', `<svg data-g="${i}"`)).join('');
-  const nextLabel = { confirmed: 'Assign a wrapper', assigned: 'Dispatch wrapper', enroute: 'Skip to arrival', arrived: 'Start wrapping', wrapping: 'Finish wrapping' }[b.status];
-  return `<div class="screen" style="padding-bottom:calc(24px + var(--safe-b))">
-    <div class="mapwrap"><div class="topbar"><a class="iconbtn" href="#/bookings" aria-label="Back">${ic('back')}</a><div class="grow"></div></div>
-      ${mapSvg(b)}${nextLabel && !cancelled ? `<button class="demo" data-act="advance" data-id="${b.id}">Demo: ${nextLabel} ›</button>` : ''}</div>
-    <div class="sheetpanel"><div class="grab"></div>
-      <div class="row between"><div class="grow"><h2 style="font-size:26px">${head[0]}</h2><p class="muted small mt8" id="subhead">${head[1]}</p></div>
-        ${b.status === 'enroute' ? `<div class="center"><div class="eta" id="eta">–</div><div class="tiny muted">min</div></div>` : ''}</div>
-      ${b.status === 'enroute' ? '<div class="bar"><i id="bar" style="width:0"></i></div>' : '<div class="hline"></div>'}
-      ${wrapperShown ? `<div class="row"><div class="avatar">CL</div><div class="grow"><b>${WRAPPER.name}</b>
-        <div class="muted small">★ ${WRAPPER.rating} · ${WRAPPER.wraps.toLocaleString()} wraps</div><div class="muted small">${WRAPPER.car}</div></div>
-        <button class="iconbtn" data-act="chat" aria-label="Message">${ic('chat')}</button><button class="iconbtn" data-act="call" aria-label="Call">${ic('phone')}</button></div><div class="hline"></div>` : ''}
-      ${inprog || b.status === 'done' ? `<div><div class="between row"><b>Gifts wrapped</b><span class="gold" id="gcount">${b.status === 'done' ? b.gifts : 0} / ${b.gifts}</span></div><div class="gifts" id="gifts">${gifts}</div></div><div class="hline"></div>` : ''}
-      ${b.status === 'done' ? `<div class="center"><b>Rate ${WRAPPER.name.split(' ')[0]}</b><div class="stars mt8">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div></div><div class="hline"></div>` : ''}
-      ${cancelled ? '' : `<div class="timeline">${STAGES.map((s, i) => `<div class="tl ${i < idx || b.status === 'done' ? 'done' : i === idx ? 'now' : ''}"><i></i>${s.label}</div>`).join('')}</div><div class="hline"></div>`}
-      <div class="kv">${ic('gift')}<div class="grow"><b>${p.name}</b><div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${b.id}</div></div><b>${money(b.total)}</b></div>
-      <div class="kv">${ic('cal')}<div><b>${b.time === 'asap' ? 'As soon as possible' : dayLong(b.date)}</b><div class="muted small">${b.time === 'asap' ? 'Same-day dispatch' : 'Arrives ' + hourLabel(+b.time)}</div></div></div>
-      <div class="kv">${ic('pin')}<div><b>${esc(b.address.line)}</b><div class="muted small">${esc([b.address.unit, b.address.notes].filter(Boolean).join(' · '))}</div></div></div>
-      <div class="actions mt16">
-        <button class="btn ghost" data-act="ics" data-id="${b.id}">${ic('cal')} Calendar</button>
-        ${b.status === 'done' || cancelled ? `<button class="btn ghost" data-act="rebook" data-id="${b.id}">Book again</button>` : `<button class="btn danger" data-act="cancel" data-id="${b.id}">Cancel booking</button>`}</div>
-    </div></div>`;
-}
-function mapSvg(b) {
-  const streets = Array.from({ length: 8 }, (_, i) => `<path d="M${i * 60 - 10} 0V360" stroke="#1d1d21" stroke-width="12"/>`).join('') +
-    Array.from({ length: 7 }, (_, i) => `<path d="M0 ${i * 55 + 10}H400" stroke="#1d1d21" stroke-width="12"/>`).join('');
-  return `<svg class="map" viewBox="0 0 400 360" preserveAspectRatio="xMidYMid slice" aria-label="Map"><rect width="400" height="360" fill="#0f0f11"/>
-    <rect x="190" y="180" width="90" height="60" rx="10" fill="#10201a"/><path d="M0 70 C120 110 220 20 400 60" stroke="#101c2a" stroke-width="26" fill="none"/>${streets}
-    <path d="${ROUTE_D}" stroke="#2c2412" stroke-width="7" fill="none" stroke-linejoin="round"/>
-    <path id="route" d="${ROUTE_D}" stroke="#c9a45c" stroke-width="3" fill="none" stroke-linejoin="round" stroke-dasharray="1 7" stroke-linecap="round"/>
-    <g transform="translate(330 90)"><circle r="20" fill="#c9a45c" opacity=".18"/><circle r="7" fill="#f4efe6"/></g>
-    ${b.status === 'confirmed' || b.status === 'cancelled' ? '' : `<g id="car" transform="translate(50 320)"><circle r="17" fill="#c9a45c"/><g transform="translate(-9 -9) scale(.15)"><path d="M60 0L0 60 60 120 120 60z" fill="none"/></g>
-      <path d="M-7 -2h14v9h-14zM-9 -2h18M0 -2v9M0 -2c-5-6-9-1-5 0M0 -2c5-6 9-1 5 0" stroke="#1a1408" stroke-width="1.8" fill="none" stroke-linecap="round"/></g>`}</svg>`;
-}
-
-let cleanup = null;
-function mountTrack(b) {
-  const path = $('#route'), car = $('#car');
-  const place = f => { if (!path || !car) return; const L = path.getTotalLength(), pt = path.getPointAtLength(L * f); car.setAttribute('transform', `translate(${pt.x} ${pt.y})`); };
-  if (b.status === 'assigned') place(0);
-  if (b.status === 'arrived' || b.status === 'wrapping' || b.status === 'done') place(1);
-  const timers = [];
-  if (b.status === 'enroute') {
-    const total = 18000, startFrom = S.sim[b.id] || 0, t0 = performance.now() - startFrom * total;
-    const tick = () => {
-      const f = Math.min(1, (performance.now() - t0) / total);
-      S.sim[b.id] = f; place(f);
-      $('#eta') && ($('#eta').textContent = Math.max(1, Math.ceil(12 * (1 - f))));
-      $('#bar') && ($('#bar').style.width = f * 100 + '%');
-      $('#subhead') && ($('#subhead').textContent = f < .5 ? WRAPPER.car : 'Almost there — look out for her at the door.');
-      if (f >= 1) { setStatus(b.id, 'arrived'); push('Camille has arrived'); } else timers.push(requestAnimationFrame(tick));
-    };
-    tick();
-  }
-  if (b.status === 'wrapping') {
-    const els = [...document.querySelectorAll('#gifts svg')]; let n = 0;
-    const iv = setInterval(() => {
-      if (n < els.length) { els[n++].classList.add('done'); $('#gcount').textContent = `${Math.round(n / els.length * b.gifts)} / ${b.gifts}`; }
-      else { clearInterval(iv); setStatus(b.id, 'done'); push('All wrapped!'); }
-    }, 1100);
-    timers.push(iv);
-  }
-  if (b.status === 'done') document.querySelectorAll('#gifts svg').forEach(e => e.classList.add('done'));
-  return () => timers.forEach(t => { cancelAnimationFrame(t); clearInterval(t); });
-}
+/* ---------- Booking detail ---------- */
 function setStatus(id, status) {
   const b = S.bookings.find(x => x.id === id); if (!b) return;
   b.status = status; save();
   if (location.hash === '#/track/' + id) render();
 }
-function push(msg) { toast('🎁 ' + msg); try { navigator.vibrate && navigator.vibrate(60); } catch { /* ignore */ } }
+function bookingView(b) {
+  const p = pkgOf(b.pkg), idx = STAGES.findIndex(s => s.id === b.status), cancelled = b.status === 'cancelled';
+  const first = WRAPPER.name.split(' ')[0];
+  const nextLabel = { confirmed: 'wrapper assigned', assigned: 'day of service', today: 'completed' }[b.status];
+  const addons = (b.addons || []).map(id => ADDONS.find(a => a.id === id));
+  const intro = {
+    confirmed: ['A wrapper is being matched', 'We’ll introduce your wrapper by message the day before your appointment.'],
+    assigned: [`${first} will be with you`, 'Your wrapper has reviewed your order and will bring every material.'],
+    today: [`${first} is on her way`, 'Please have your gifts gathered in one place. You’ll receive a message on arrival.'],
+    done: ['Wrapped to perfection', 'We hope they love it.'],
+  };
+  return `<div class="screen" style="padding-bottom:calc(40px + var(--safe-b))">
+    <div class="topbar"><a class="iconbtn" href="#/bookings" aria-label="Back">${ic('back')}</a><div class="grow tiny muted">Booking ${b.id}</div></div>
+    <div class="pad"><div class="appt"><span class="status ${b.status === 'done' ? 'done' : cancelled ? 'cancelled' : ''}">${cancelled ? 'Cancelled' : STAGES[idx].long}</span>
+      <div class="when">${b.time === 'asap' ? 'Today, as soon as possible' : dayLong(b.date)}</div>
+      <div class="muted">${b.time === 'asap' ? 'Same-day dispatch' : 'Arrival at ' + hourLabel(+b.time)}</div>
+      <div class="muted small mt8">${esc(b.address.line)}${b.address.unit ? ', ' + esc(b.address.unit) : ''}</div></div></div>
+    ${cancelled ? '' : `<div class="pad mt24"><div class="timeline">${STAGES.map((s, i) => `<div class="tl ${i < idx || b.status === 'done' ? 'done' : i === idx ? 'now' : ''}"><i></i>${s.label}</div>`).join('')}</div></div>`}
+    <div class="sec"><h3>${cancelled ? 'Booking cancelled' : 'Your wrapper'}</h3></div>
+    <div class="pad">${cancelled ? '<p class="muted">No charge was made.</p>' : idx >= 1 ? `<div class="card"><div class="row"><div class="avatar">CL</div><div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${WRAPPER.name}</b>
+        <div class="muted small">★ ${WRAPPER.rating} · ${WRAPPER.wraps.toLocaleString()} wraps · ${WRAPPER.bio}</div></div></div>
+        <p class="small mt16">${intro[b.status][1]}</p>
+        <div class="actions mt16"><button class="btn ghost sm" data-act="chat">Message</button><button class="btn ghost sm" data-act="call">Call</button></div></div>`
+        : `<div class="card"><b>${intro.confirmed[0]}</b><p class="muted small mt8">${intro.confirmed[1]}</p></div>`}</div>
+    ${b.status === 'done' ? `<div class="sec"><h3>Rate your experience</h3></div><div class="stars">${[1, 2, 3, 4, 5].map(n => `<button class="${(b.rating || 0) >= n ? 'on' : ''}" data-act="rate" data-id="${b.id}" data-v="${n}" aria-label="${n} stars"><svg viewBox="0 0 24 24">${ICONS.star}</svg></button>`).join('')}</div>` : ''}
+    <div class="sec"><h3>Your order</h3></div>
+    <div class="pad"><div class="card"><div class="row">${gift(b.palette, 56)}<div class="grow"><b style="font-family:var(--serif);font-size:20px;font-weight:500">${p.name}</b>
+      <div class="muted small">${b.gifts} gifts · ${esc(b.occasion)} · ${palOf(b.palette).name}</div></div></div>
+      ${addons.length ? `<div class="hline"></div><div class="small">${addons.map(a => `<div class="row between"><span>${a.name}</span><span class="muted">${money(a.price)}</span></div>`).join('')}</div>` : ''}
+      ${b.note ? `<div class="hline"></div><div class="tiny muted">Your note</div><p class="small mt8">${esc(b.note)}</p>` : ''}
+      <div class="hline"></div><div class="row between"><span>Total</span><b style="font-family:var(--serif);font-size:22px;font-weight:500">${money(b.total)}</b></div></div></div>
+    ${cancelled || b.status === 'done' ? '' : `<div class="sec"><h3>Before we arrive</h3></div><div class="pad"><ul class="checklist">
+      <li>${ic('check')}Gather your gifts in one room, with any boxes or bags to be reused.</li>
+      <li>${ic('check')}Set aside a clear table or surface about 1.5 m wide.</li>
+      <li>${ic('check')}Have recipient names ready if you’ve ordered gift tags.</li>
+      <li>${ic('check')}We bring all paper, ribbon and tools, and take away every offcut.</li></ul></div>`}
+    <div class="pad mt24"><div class="actions"><button class="btn ghost" data-act="ics" data-id="${b.id}">Calendar</button>
+      ${b.status === 'done' || cancelled ? `<button class="btn" data-act="rebook" data-id="${b.id}">Book again</button>` : `<button class="btn danger" data-act="cancel" data-id="${b.id}">Cancel</button>`}</div>
+      ${nextLabel && !cancelled ? `<button class="previewlink" data-act="advance" data-id="${b.id}">Demo: preview “${nextLabel}” ›</button>` : ''}</div></div>`;
+}
 
 route(/^track\/([\w-]+)$/, id => {
   const b = S.bookings.find(x => x.id === id);
   if (!b) return { redirect: '#/bookings' };
-  return { html: trackView(b), mount: () => mountTrack(b) };
+  return { html: bookingView(b) };
 });
 
 /* ---------- Router ---------- */
 let current = '';
 function render() {
-  cleanup && cleanup(); cleanup = null;
   const h = location.hash.replace(/^#\/?/, '');
   for (const [re, fn] of routes) {
     const m = h.match(re); if (!m) continue;
@@ -482,7 +433,7 @@ function render() {
     if (!keepScroll) { app.style.animation = 'none'; app.offsetHeight; app.style.animation = ''; }
     app.scrollTop = keepScroll ? top : 0;
     current = h;
-    if (r.mount) { const c = r.mount(); if (typeof c === 'function') cleanup = c; }
+    if (r.mount) r.mount();
     return;
   }
   location.replace('#/');
@@ -518,9 +469,9 @@ const actions = {
   bktab(el) { S.bkTab = el.dataset.v; save(); render(); },
   advance(el) {
     const b = S.bookings.find(x => x.id === el.dataset.id), i = STAGES.findIndex(s => s.id === b.status);
-    if (b.status === 'enroute') S.sim[b.id] = 1;
     setStatus(b.id, STAGES[Math.min(i + 1, STAGES.length - 1)].id);
-    if (b.status === 'assigned') push('Camille is your wrapper'); if (b.status === 'enroute') push('Camille is on her way');
+    const msg = { assigned: 'Camille has been assigned', today: 'Camille is on her way', done: 'All wrapped!' }[b.status];
+    msg && toast(msg);
   },
   rate(el) { const b = S.bookings.find(x => x.id === el.dataset.id); b.rating = +el.dataset.v; save(); render(); toast('Thanks for the feedback'); },
   call() { toast('Calling Camille… (demo)'); },

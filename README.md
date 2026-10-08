@@ -10,13 +10,13 @@ python3 -m http.server 8000     # or any static server
 ```
 
 ## Demo flow
-1. **Home** → *Book a wrapper* (or tap a package)
+1. **Home** → *Book an appointment* (or tap a package)
 2. **Package** — Classic / Signature / Atelier / Maison Couture
 3. **Customize** — gift count, occasion, palette, add-ons, notes
 4. **Schedule** — "Wrap me now" (same-day) or pick a day + slot (some slots are randomly booked)
 5. **Address** — search (try "5th", "Greene"), saved places, or mock current location
 6. **Review** — tip, payment, promo (`WRAP10`, `WELCOME15`), itemised total
-7. **Confirmed** → **Track**: tap the dashed *Demo* button to step through assigned → on the way (animated map) → arrived → wrapping → complete, then rate. Chat, cancel, add-to-calendar (.ics) and *Book again* all work.
+7. **Confirmed** → **Booking page**: appointment card, status, your wrapper, order summary, prep checklist. Use the small "Demo: preview …" link to step through assigned → day of service → complete, then rate. Chat, cancel, add-to-calendar (.ics) and *Book again* work.
 
 *Account → Reset demo data* restores the sample history.
 
