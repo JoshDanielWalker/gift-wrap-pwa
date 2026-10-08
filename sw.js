@@ -1,6 +1,8 @@
-const CACHE = 'ribbon-v6';
+const CACHE = 'ribbon-v7';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest',
-  './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
+  './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png',
+  './fonts/cormorant-garamond-latin-400-normal.woff2', './fonts/cormorant-garamond-latin-500-normal.woff2', './fonts/cormorant-garamond-latin-600-normal.woff2',
+  './fonts/cormorant-garamond-latin-400-italic.woff2', './fonts/cormorant-garamond-latin-500-italic.woff2', './fonts/inter-latin-wght-normal.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

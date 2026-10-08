@@ -75,3 +75,9 @@ A private invitation rather than a referral link: each member has a personal cod
 - **Gift card redemption**: enter a purchased `RC-XXXX-XXXX` code in the promo field at checkout and its value becomes Ribbon credit (single use, works across accounts on the same device).
 - **Gratuity after service**: optional $10 / $20 / $40 on a completed booking, shown on the receipt.
 - **Accessibility**: visible focus rings, Esc closes dialogs and returns focus.
+
+## Design system
+- **Type**: Cormorant Garamond (display) and Inter (interface), self-hosted in `fonts/` (SIL Open Font License), pre-cached for offline. One type scale (`.title`, `.sec h3`, `.ct`, `.lead`, `.stat`, `.tiny`) replaces ad-hoc inline sizes.
+- **Tokens**: colour, gutter, radius, elevation and easing live in `:root`; the gold used for small text is darkened to meet WCAG AA on ivory.
+- **Components**: one button hierarchy (primary / ghost / danger, `.sm`), one card and "letter" surface, one list-row pattern (icon medallion, hairline separators), shared `pagehead` for tab pages, consistent chips, fields and toggles.
+- **Experience**: directional page transitions (forward / back / tab fade), scroll position remembered on tab pages, topbar hairline on scroll, "Securing the diary…" state on booking, inline validation on contact details, step names in the booking flow, selected-state labels on packages, press and hover states, refined gift illustration and monogram.
