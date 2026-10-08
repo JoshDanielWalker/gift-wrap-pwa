@@ -135,7 +135,7 @@ function gift(palId, size) {
     <circle cx="60" cy="44" r="5.5" fill="${p.rib}"/><circle cx="58.5" cy="42.5" r="2" fill="#fff" fill-opacity=".45"/></svg>`;
 }
 /** Monogram: a thin ring around R & C. */
-const monogram = () => `<svg class="mono" viewBox="0 0 64 64" role="img" aria-label="Ribbon & Co."><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="32" cy="32" r="26.5" fill="none" stroke="currentColor" stroke-width=".5" opacity=".6"/>
+const monogram = () => `<svg class="mono" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="32" cy="32" r="26.5" fill="none" stroke="currentColor" stroke-width=".5" opacity=".6"/>
   <text x="22" y="39" font-size="22" text-anchor="middle">R</text><text x="43" y="39" font-size="22" text-anchor="middle">C</text><path d="M30 20c2 4 4 4 4 0M30 44c2-4 4-4 4 0" fill="none" stroke="currentColor" stroke-width=".8" opacity=".0"/><path d="M29 32h6" stroke="currentColor" stroke-width="1"/></svg>`;
 /** Shared header for tab pages, so every top-level screen starts the same way. */
 const pagehead = (eyebrow, title, sub) => `<header class="pagehead">${eyebrow ? `<span class="tiny">${eyebrow}</span>` : ''}<h1 class="title">${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}</header>`;
@@ -331,7 +331,8 @@ function toast(msg) {
 function openSheet(html, onMount) {
   closeSheet();
   const bg = document.createElement('div'); bg.id = 'sheetbg';
-  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Dialog">${html}</div>`;
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  const dlg = bg.firstChild, hd = dlg.querySelector('h3'); if (hd) { hd.id = 'dlg-title'; dlg.setAttribute('aria-labelledby', 'dlg-title'); } else dlg.setAttribute('aria-label', 'Dialog');
   bg.addEventListener('click', e => { if (e.target === bg) closeSheet(); });
   sheetOpener = document.activeElement;
   $('#shell').appendChild(bg);
@@ -343,8 +344,8 @@ function closeSheet() { const had = $('#sheetbg'); had?.remove(); if (had && she
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
 function tabbar(active) {
-  const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}">${ic(n)}${l}${h === 'account' && unread() ? '<i class="badge-dot" aria-label="Unread letters"></i>' : ''}</a>`;
-  return `<nav class="tabs">${t('', 'home', 'Home')}${t('occasions', 'gem', 'Occasions')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
+  const t = (h, n, l) => `<a href="#/${h}" class="${active === h ? 'on' : ''}" ${active === h ? 'aria-current="page"' : ''}>${ic(n)}${l}${h === 'account' && unread() ? '<i class="badge-dot" aria-label="Unread letters"></i>' : ''}</a>`;
+  return `<nav class="tabs" aria-label="Main">${t('', 'home', 'Home')}${t('occasions', 'gem', 'Occasions')}${t('bookings', 'cal', 'Bookings')}${t('account', 'user', 'Account')}</nav>`;
 }
 const STEPS = ['packages', 'customize', 'schedule', 'address', 'review'], STEP_NAMES = ['Package', 'Personalise', 'Schedule', 'Address', 'Review'];
 function flow(step, title, sub, body, cta) {
@@ -682,7 +683,7 @@ route(/^account$/, () => {
     <div class="mt24">${list}
     ${u ? `<button class="acct" data-act="signout">${ic('close')}<span class="grow"><b>Sign out</b></span></button>` : ''}
     <button class="acct" data-act="reset">${ic('reset')}<span class="grow"><b>Reset demo data</b><span class="muted small" style="display:block">Clear everything and start as a new guest</span></span></button></div>
-    <p class="muted small center mt24">Ribbon &amp; Co. demo · all data is mocked</p></div></div>${tabbar('account')}` };
+    <p class="muted small center mt24">Ribbon &amp; Co. demo · all data is mocked · v${VERSION}</p></div></div>${tabbar('account')}` };
 });
 
 /* ---------- Booking detail ---------- */
@@ -1004,8 +1005,25 @@ route(/^prefs$/, () => sub('Notifications', 'Choose how we keep you informed.',
     `<button class="acct" data-act="pref" data-k="${k}"><span class="grow"><b>${t}</b><span class="muted small" style="display:block">${d}</span></span><span class="toggle ${S.prefs[k] ? 'on' : ''}"><i></i></span></button>`).join('')}</div>`));
 
 /* ---------- Router ---------- */
-let current = '';
+let current = null;
 const TABS = ['', 'occasions', 'bookings', 'account'], hist = [], tabScroll = {};
+/** Title, spoken announcement and keyboard focus for each new page, so screen-reader and keyboard users land at the top. */
+function announcePage(app) {
+  const h1 = app.querySelector('h1'), name = (h1 ? h1.innerText : 'Ribbon & Co.').replace(/\s+/g, ' ').trim();
+  document.title = name === 'Ribbon & Co.' ? name : `${name} · Ribbon & Co.`;
+  const a = $('#announce'); if (a) { a.textContent = ''; setTimeout(() => { a.textContent = name; }, 60); }
+  app.focus({ preventScroll: true });
+}
+const DAY_STATE = { open: 'available', few: 'few times left', full: 'fully booked', off: 'closed', locked: 'by invitation', past: 'unavailable' };
+/** Adds state to controls that only show it visually (selected, on/off, calendar availability, invalid fields). */
+function a11y(app) {
+  app.querySelectorAll('.chip,.day,.slot,.sw,.tips button,.seg button,.opt,.pay,.pkg,.cell').forEach(el => el.setAttribute('aria-pressed', el.classList.contains('on') ? 'true' : 'false'));
+  app.querySelectorAll('.acct:has(.toggle)').forEach(el => { el.setAttribute('role', 'switch'); el.setAttribute('aria-checked', el.querySelector('.toggle.on') ? 'true' : 'false'); });
+  app.querySelectorAll('.cell[data-v]').forEach(el => { const st = (el.className.match(/\b(open|few|full|off|locked|past)\b/) || [])[1] || 'open'; el.setAttribute('aria-label', `${dayLong(el.dataset.v)}, ${DAY_STATE[st]}${el.classList.contains('peak') ? ', peak date' : ''}`); });
+  app.querySelectorAll('.day[data-v]').forEach(el => el.setAttribute('aria-label', `${dayLong(el.dataset.v)}${el.classList.contains('flag') ? ', ' + el.querySelector('small:last-child').textContent.toLowerCase() : ''}`));
+  app.querySelectorAll('.sw').forEach(el => el.setAttribute('aria-label', `${el.dataset.id} theme`));
+  app.querySelectorAll('svg.gift').forEach(el => el.setAttribute('role', 'presentation'));
+}
 function render() {
   const h = location.hash.replace(/^#\/?/, '');
   for (const [re, fn] of routes) {
@@ -1017,7 +1035,8 @@ function render() {
     if (!same && TABS.includes(current)) tabScroll[current] = top;
     let dir = null;
     if (!same) {
-      if (hist.length > 1 && hist[hist.length - 2] === h) { hist.pop(); dir = 'back'; }
+      if (current === null) hist.push(h);
+      else if (hist.length > 1 && hist[hist.length - 2] === h) { hist.pop(); dir = 'back'; }
       else { dir = TABS.includes(h) && TABS.includes(current) ? 'fade' : 'fwd'; hist.push(h); if (hist.length > 60) hist.shift(); }
     }
     app.innerHTML = r.html;
@@ -1025,6 +1044,8 @@ function render() {
     if (dir) { app.offsetHeight; app.className = 'nav-' + dir; }
     app.scrollTop = same ? top : (TABS.includes(h) && dir === 'back' ? tabScroll[h] || 0 : 0);
     current = h;
+    if (!same) announcePage(app);
+    a11y(app);
     if (r.mount) r.mount();
     return;
   }
@@ -1344,6 +1365,7 @@ const actions = {
     addLetter('concierge', 'Consultation requested', `The concierge will call you ${when}, in the ${time}, about ${topic}.`, '#/letters');
     closeSheet(); toast('We’ll call you ' + when); render();
   },
+  reload() { location.reload(); },
   soon() { toast('Not part of this demo'); },
   reset() {
     openSheet(`<h3>Reset demo?</h3><p class="muted small">This clears every booking and account on this device and starts again as a new guest.</p>
@@ -1371,7 +1393,7 @@ document.addEventListener('change', e => {
 document.addEventListener('focusout', e => {
   const k = e.target.dataset && e.target.dataset.bind; if (!k || !k.startsWith('contact.')) return;
   const v = e.target.value, ok = k === 'contact.name' ? v.trim().length >= 2 : k === 'contact.email' ? validEmail(v) : v.replace(/\D/g, '').length >= 10;
-  e.target.closest('.field').classList.toggle('bad', !!v && !ok);
+  e.target.closest('.field').classList.toggle('bad', !!v && !ok); e.target.setAttribute('aria-invalid', !!v && !ok ? 'true' : 'false');
 });
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.bind; if (!k) return;
@@ -1380,6 +1402,7 @@ document.addEventListener('input', e => {
 });
 
 /* ---------- Boot ---------- */
+const VERSION = '2026.10.08';
 try {
   const code = new URLSearchParams(location.search).get('invite');
   if (code) {
@@ -1390,4 +1413,16 @@ try {
 } catch { /* ignore */ }
 if (!location.hash) location.replace('#/');
 render();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { /* offline support optional */ });
+function showUpdate() {
+  if ($('#update')) return;
+  const b = document.createElement('div'); b.id = 'update'; b.setAttribute('role', 'status');
+  b.innerHTML = `<span>A new version is available</span><button data-act="reload">Refresh</button>`;
+  $('#shell').appendChild(b);
+}
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+  }).catch(() => { /* offline support optional */ });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) showUpdate(); });
+}
