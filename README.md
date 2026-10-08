@@ -21,3 +21,10 @@ python3 -m http.server 8000     # or any static server
 *Account → Reset demo data* restores the sample history.
 
 Offline-capable via `sw.js`; installable via `manifest.webmanifest`.
+
+## Also in the demo
+- **Package detail sheets** — "View details & the ritual" on each package
+- **Handwritten note card** add-on with your own message (shown on the booking page)
+- **Reschedule** an upcoming booking from its booking page (free, tracked)
+- **Wrap again** shortcut on Home for repeat customers, plus a holiday-season banner
+- **Account**: saved addresses (add/remove), payment cards (add with brand detection/remove), gift cards & offers, concierge chat + FAQ, notification preferences
